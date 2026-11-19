@@ -15,7 +15,7 @@ function fixPem(t) {
 function secret(name) {
   const v = process.env[name];
   if (!v) return undefined;
-  const t = v.trim();
+  const t = v.replace(/\r/g, '').trim();
   if (t.startsWith('{')) return Buffer.from(t);
   if (t.startsWith('-----BEGIN')) return Buffer.from(fixPem(t));
   const file = path.resolve(t);
