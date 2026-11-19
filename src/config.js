@@ -2,12 +2,22 @@ try { require('dotenv').config({ quiet: true }); } catch {}
 const fs = require('fs');
 const path = require('path');
 
+// Rebuild a PEM that lost its line breaks (e.g. pasted into a one-line field).
+function fixPem(t) {
+  t = t.replace(/\\n/g, '\n');
+  const m = t.match(/^(-----BEGIN [^-]+-----)([\s\S]*?)(-----END [^-]+-----)/);
+  if (!m) return t;
+  const body = m[2].replace(/\s+/g, '').match(/.{1,64}/g) || [];
+  return `${m[1]}\n${body.join('\n')}\n${m[3]}\n`;
+}
+
 // A secret can be given as: raw PEM/JSON text, base64 of it, or a file path (local dev).
 function secret(name) {
   const v = process.env[name];
   if (!v) return undefined;
   const t = v.trim();
-  if (t.startsWith('-----BEGIN') || t.startsWith('{')) return Buffer.from(t.replace(/\\n/g, '\n'));
+  if (t.startsWith('{')) return Buffer.from(t);
+  if (t.startsWith('-----BEGIN')) return Buffer.from(fixPem(t));
   const file = path.resolve(t);
   if (t.length < 300 && fs.existsSync(file)) return fs.readFileSync(file);
   try {
