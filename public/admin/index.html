@@ -72,7 +72,7 @@ let TOKEN='', DATA={price:2,families:[]}, sel=new Set();
 const $=id=>document.getElementById(id);
 try{TOKEN=sessionStorage.getItem('adm')||''}catch{}
 const countryOf=ph=>COUNTRIES.find(c=>('+'+ph).startsWith(c[0]))||['?','🌍','أخرى'];
-async function api(path,opt={}){const r=await fetch(path,{...opt,headers:{authorization:'Bearer '+TOKEN,'content-type':'application/json',...(opt.headers||{})}});if(r.status===401)throw new Error('401');return r.json()}
+async function api(path,opt={}){const r=await fetch(path,{...opt,headers:{authorization:'Bearer '+TOKEN,'content-type':'application/json',...(opt.headers||{})}});if(r.status===401)throw new Error('401');if(!r.ok)throw new Error('HTTP '+r.status+': '+(await r.text()).slice(0,200));return r.json()}
 async function load(){
   DATA=await api('/admin/api/families');
   $('login').classList.add('hidden');$('app').classList.remove('hidden');render();
@@ -96,7 +96,7 @@ function render(){
   const n=L.filter(f=>f.optInOffers).length;$('sendInfo').textContent=`سيصل إلى ${n} عائلة`;$('send').disabled=!n;
 }
 $('q').oninput=render;$('st').onchange=render;
-$('go').onclick=async()=>{TOKEN=$('tok').value.trim();try{await load();try{sessionStorage.setItem('adm',TOKEN)}catch{}}catch(e){$('err').textContent='رمز غير صحيح'}};
+$('go').onclick=async()=>{TOKEN=$('tok').value.replace(/\s/g,'');try{await load();try{sessionStorage.setItem('adm',TOKEN)}catch{}}catch(e){$('err').textContent=e.message==='401'?'رمز غير صحيح (تأكد أن ADMIN_TOKEN مضاف وأنك نشرت بعده، وراجع /health)':'خطأ في السيرفر: '+e.message}};
 $('send').onclick=async()=>{const text=$('msg').value.trim();if(!text)return;$('send').disabled=true;$('sendInfo').textContent='جارٍ الإرسال...';
   const r=await api('/admin/api/broadcast',{method:'POST',body:JSON.stringify({text,countries:[...sel],status:$('st').value})});
   $('sendInfo').textContent=`✅ أُرسل إلى ${r.sent} عائلة`;$('msg').value='';load()};

@@ -56,7 +56,13 @@ async function handle(req) {
   const m = req.method;
   let r;
 
-  if (p === '/health') return json({ ok: true, price: cfg.priceUsd, storage: require('./kv').backend });
+  if (p === '/health') return json({
+    ok: true, price: cfg.priceUsd, storage: require('./kv').backend, baseUrl: cfg.baseUrl,
+    adminTokenSet: Boolean(cfg.adminToken), adminTokenLength: cfg.adminToken.length,
+    apple: { teamId: Boolean(cfg.apple.teamId), passTypeId: cfg.apple.passTypeId || null,
+      cert: Boolean(cfg.apple.signerCert), key: Boolean(cfg.apple.signerKey), wwdr: Boolean(cfg.apple.wwdr) },
+    whatsapp: Boolean(cfg.whatsapp.token), stripe: Boolean(cfg.stripe.paymentLink), google: Boolean(cfg.google.serviceAccount),
+  });
 
   // WhatsApp
   if (p === '/webhook' && m === 'GET') { const v = wa.verify(url.searchParams); return text(v.body, v.status); }
