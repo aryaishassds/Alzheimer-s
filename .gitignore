@@ -1,0 +1,8 @@
+node_modules/
+.env
+certs/
+data/
+.netlify/
+*.pem
+*.p12
+*.cer

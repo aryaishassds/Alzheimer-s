@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>لوحة تحكم كرت الطلبات</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#16181d;--muted:#6b7280;--line:#e6e8ec;--brand:#0f766e;--soft:#e6f4f2;--warn:#b45309;--warnsoft:#fef3c7;--ok:#15803d;--oksoft:#dcfce7;--bad:#b91c1c;--badsoft:#fee2e2;--info:#1d4ed8;--infosoft:#dbeafe}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{margin:0;font-size:19px}main{max-width:1240px;margin:0 auto;padding:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.panel{margin-bottom:16px}.panel h2{margin:0 0 12px;font-size:16px}
+.kpi .l{color:var(--muted);font-size:13px}.kpi .v{font-size:26px;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chip.on{background:var(--soft);border-color:var(--brand);color:var(--brand);font-weight:700}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--bg);color:var(--ink)}
+textarea{width:100%;min-height:90px}
+.btn{font:inherit;border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--brand);color:#fff}
+.btn:disabled{opacity:.45}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:500}td.ph{direction:ltr;unicode-bidi:isolate;text-align:right}
+.st{padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.paid{background:var(--oksoft);color:var(--ok)}.trial{background:var(--infosoft);color:var(--info)}.expired{background:var(--badsoft);color:var(--bad)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.muted{color:var(--muted);font-size:13px}
+.note{border-radius:10px;padding:10px 12px;font-size:13px;margin-top:10px;background:var(--infosoft);color:var(--info)}
+.wrapt{overflow-x:auto}#login{max-width:380px;margin:80px auto}.hidden{display:none}
+</style>
+</head>
+<body>
+<header><h1>🛒 لوحة تحكم كرت الطلبات</h1><span class="muted" id="who"></span></header>
+
+<div id="login" class="panel">
+  <h2>تسجيل الدخول</h2>
+  <p class="muted">أدخل قيمة ADMIN_TOKEN التي وضعتها في إعدادات Netlify.</p>
+  <input id="tok" type="password" style="width:100%" placeholder="ADMIN_TOKEN">
+  <div style="margin-top:10px"><button class="btn" id="go">دخول</button> <span class="muted" id="err"></span></div>
+</div>
+
+<main id="app" class="hidden">
+  <section class="kpis" id="kpis"></section>
+  <div class="panel"><h2>فلترة حسب الدولة (مقدمة الرقم)</h2><div class="chips" id="chips"></div>
+    <div class="row" style="margin-top:12px">
+      <input type="search" id="q" placeholder="بحث بالاسم أو الرقم" style="flex:1;min-width:200px">
+      <select id="st"><option value="">كل الحالات</option><option value="paid">مدفوع</option><option value="trial">تجربة</option><option value="expired">منتهي</option></select>
+    </div>
+  </div>
+  <div class="panel"><div class="muted" id="count"></div><div class="wrapt"><table>
+    <thead><tr><th>الاسم</th><th>الرقم</th><th>الدولة</th><th>الحالة</th><th>أفراد العائلة</th><th>أجهزة آيفون</th><th>أغراض الآن</th><th>مواقع</th><th>تاريخ الاشتراك</th><th>العروض</th></tr></thead>
+    <tbody id="rows"></tbody></table></div></div>
+  <div class="panel"><h2>📣 إرسال عرض كتنبيه على الكرت (مجاني)</h2>
+    <p class="muted">يُرسل للمجموعة المفلترة أعلاه (الدول والحالة) لمن يقبل العروض فقط.</p>
+    <textarea id="msg" placeholder="مثال: جدّد اشتراكك لسنتين بخصم 50% 🎉"></textarea>
+    <div class="row" style="margin-top:10px"><button class="btn" id="send">إرسال</button><span class="muted" id="sendInfo"></span></div>
+    <div class="note">على الآيفون يظهر النص في الإشعار كما هو. على الأندرويد يظهر إشعار من Google Wallet ويرى العميل النص في الكرت.</div>
+  </div>
+  <div class="panel"><h2>🧪 تجربة الكرت بدون واتساب</h2>
+    <p class="muted">أنشئ كرتاً لرقمك، افتح الرابط من الآيفون وأضفه للمحفظة، ثم أضف أغراضاً من هنا لترى التحديث.</p>
+    <div class="row"><input id="tph" placeholder="رقمك مع مقدمة الدولة، مثل 9665xxxxxxxx" dir="ltr" style="min-width:260px"><button class="btn" id="tmk">إنشاء كرت</button></div>
+    <div id="tlink" class="note hidden"></div>
+    <div class="row" style="margin-top:10px"><input id="titems" placeholder="رز، خبز" style="min-width:260px"><button class="btn" id="tadd">إضافة أغراض</button><span class="muted" id="tinfo"></span></div>
+  </div>
+  <div class="panel"><h2>🕓 سجل الحملات</h2><div id="camps" class="muted">—</div></div>
+</main>
+
+<script>
+const COUNTRIES=[['+1','🇺🇸','أمريكا/كندا'],['+966','🇸🇦','السعودية'],['+971','🇦🇪','الإمارات'],['+965','🇰🇼','الكويت'],['+974','🇶🇦','قطر'],['+973','🇧🇭','البحرين'],['+968','🇴🇲','عُمان'],['+970','🇵🇸','فلسطين'],['+972','🇵🇸','فلسطين (+972)'],['+962','🇯🇴','الأردن'],['+20','🇪🇬','مصر']];
+let TOKEN='', DATA={price:2,families:[]}, sel=new Set();
+const $=id=>document.getElementById(id);
+try{TOKEN=sessionStorage.getItem('adm')||''}catch{}
+const countryOf=ph=>COUNTRIES.find(c=>('+'+ph).startsWith(c[0]))||['?','🌍','أخرى'];
+async function api(path,opt={}){const r=await fetch(path,{...opt,headers:{authorization:'Bearer '+TOKEN,'content-type':'application/json',...(opt.headers||{})}});if(r.status===401)throw new Error('401');return r.json()}
+async function load(){
+  DATA=await api('/admin/api/families');
+  $('login').classList.add('hidden');$('app').classList.remove('hidden');render();
+  const c=await api('/admin/api/campaigns');
+  $('camps').innerHTML=c.length?c.map(x=>`<div>• <b>${esc(x.text)}</b> — ${x.count} مستلم — ${x.countries.length?x.countries.join(' '):'الكل'} — ${new Date(x.at).toLocaleString('ar')}</div>`).join(''):'لا توجد حملات بعد';
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function filtered(){const q=$('q').value.trim().toLowerCase(),st=$('st').value;
+  return DATA.families.filter(f=>(!sel.size||[...sel].some(c=>('+'+f.owner).startsWith(c)))&&(!st||f.status===st)&&(!q||(f.name||'').toLowerCase().includes(q)||f.owner.includes(q.replace(/\D/g,''))))}
+function render(){
+  const F=DATA.families,paid=F.filter(f=>f.status==='paid').length;
+  $('kpis').innerHTML=`<div class="kpi"><div class="l">العائلات</div><div class="v">${F.length}</div></div>
+  <div class="kpi"><div class="l">مدفوع</div><div class="v">${paid}</div><div class="muted">$${(paid*DATA.price).toFixed(2)} (${DATA.price}$ للسنة)</div></div>
+  <div class="kpi"><div class="l">تجربة</div><div class="v">${F.filter(f=>f.status==='trial').length}</div></div>
+  <div class="kpi"><div class="l">الأفراد</div><div class="v">${F.reduce((a,f)=>a+f.members.length,0)}</div></div>`;
+  $('chips').innerHTML=`<button class="chip ${sel.size?'':'on'}" data-c="">🌍 الكل (${F.length})</button>`+COUNTRIES.map(([c,fl,n])=>{const k=F.filter(f=>('+'+f.owner).startsWith(c)).length;return k?`<button class="chip ${sel.has(c)?'on':''}" data-c="${c}">${fl} ${n} <span dir="ltr">${c}</span> (${k})</button>`:''}).join('');
+  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const c=b.dataset.c;if(!c)sel.clear();else sel.has(c)?sel.delete(c):sel.add(c);render()});
+  const L=filtered();$('count').textContent=`يظهر ${L.length}`;
+  const stT={paid:'مدفوع',trial:'تجربة',expired:'منتهي'};
+  $('rows').innerHTML=L.map(f=>{const c=countryOf(f.owner);return `<tr><td>${esc(f.name||'—')}<div class="muted">${f.members.filter(m=>m.phone!==f.owner).map(m=>esc(m.name||m.phone)).join('، ')}</div></td><td class="ph"><bdi dir="ltr">+${f.owner}</bdi></td><td>${c[1]} ${c[2]}</td><td><span class="st ${f.status}">${stT[f.status]}</span></td><td>${f.members.length}</td><td>${f.devices}</td><td>${f.items}</td><td>${f.locations}</td><td>${new Date(f.createdAt).toLocaleDateString('ar')}</td><td>${f.optInOffers?'✅':'—'}</td></tr>`}).join('');
+  const n=L.filter(f=>f.optInOffers).length;$('sendInfo').textContent=`سيصل إلى ${n} عائلة`;$('send').disabled=!n;
+}
+$('q').oninput=render;$('st').onchange=render;
+$('go').onclick=async()=>{TOKEN=$('tok').value.trim();try{await load();try{sessionStorage.setItem('adm',TOKEN)}catch{}}catch(e){$('err').textContent='رمز غير صحيح'}};
+$('send').onclick=async()=>{const text=$('msg').value.trim();if(!text)return;$('send').disabled=true;$('sendInfo').textContent='جارٍ الإرسال...';
+  const r=await api('/admin/api/broadcast',{method:'POST',body:JSON.stringify({text,countries:[...sel],status:$('st').value})});
+  $('sendInfo').textContent=`✅ أُرسل إلى ${r.sent} عائلة`;$('msg').value='';load()};
+$('tmk').onclick=async()=>{const r=await api('/admin/api/test-family',{method:'POST',body:JSON.stringify({phone:$('tph').value})});
+  const l=$('tlink');l.classList.remove('hidden');l.innerHTML=r.card?`رابط الكرت (افتحه من الآيفون): <a href="${r.card}" target="_blank" dir="ltr">${r.card}</a>`:'خطأ: '+esc(r.error);load()};
+$('tadd').onclick=async()=>{const r=await api('/admin/api/test-items',{method:'POST',body:JSON.stringify({phone:$('tph').value,text:$('titems').value})});
+  $('tinfo').textContent=r.ok?'✅ أُضيف. يتحدث الكرت خلال ثوانٍ':'خطأ: '+(r.error||'');$('titems').value='';load()};
+if(TOKEN)load().catch(()=>{});
+</script>
+</body>
+</html>

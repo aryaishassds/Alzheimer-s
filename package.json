@@ -1,0 +1,21 @@
+{
+  "name": "home-list-card",
+  "version": "1.0.0",
+  "description": "Home shopping list card for Apple & Google Wallet via WhatsApp",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "embed": "node scripts/embed-assets.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.9",
+    "dotenv": "^18.0.10",
+    "passkit-generator": "^3.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
