@@ -19,6 +19,29 @@ function parseTime(text) {
   return [...new Set(out)].slice(0, 3);
 }
 
+const CITY_TZ = {
+  'القاهرة': 'Africa/Cairo', 'مصر': 'Africa/Cairo', 'الاسكندرية': 'Africa/Cairo',
+  'القدس': 'Asia/Jerusalem', 'فلسطين': 'Asia/Hebron', 'رام الله': 'Asia/Hebron', 'نابلس': 'Asia/Hebron',
+  'الخليل': 'Asia/Hebron', 'غزة': 'Asia/Gaza', 'جنين': 'Asia/Hebron', 'الناصرة': 'Asia/Jerusalem', 'حيفا': 'Asia/Jerusalem',
+  'عمان الاردن': 'Asia/Amman', 'الاردن': 'Asia/Amman', 'الرياض': 'Asia/Riyadh', 'جدة': 'Asia/Riyadh', 'السعودية': 'Asia/Riyadh',
+  'دبي': 'Asia/Dubai', 'ابوظبي': 'Asia/Dubai', 'الامارات': 'Asia/Dubai', 'الكويت': 'Asia/Kuwait', 'الدوحة': 'Asia/Qatar', 'قطر': 'Asia/Qatar',
+  'البحرين': 'Asia/Bahrain', 'مسقط': 'Asia/Muscat', 'عمان': 'Asia/Muscat', 'بيروت': 'Asia/Beirut', 'بغداد': 'Asia/Baghdad',
+  'اسطنبول': 'Europe/Istanbul', 'لندن': 'Europe/London', 'برلين': 'Europe/Berlin',
+  'نيويورك': 'America/New_York', 'ميشيغان': 'America/Detroit', 'ديترويت': 'America/Detroit', 'فلوريدا': 'America/New_York',
+  'شيكاغو': 'America/Chicago', 'تكساس': 'America/Chicago', 'هيوستن': 'America/Chicago', 'دالاس': 'America/Chicago',
+  'كاليفورنيا': 'America/Los_Angeles', 'لوس انجلوس': 'America/Los_Angeles', 'new york': 'America/New_York',
+  'texas': 'America/Chicago', 'california': 'America/Los_Angeles', 'chicago': 'America/Chicago',
+};
+const norm = s => s.trim().toLowerCase().replace(/[إأآ]/g, 'ا').replace(/ة$/,'ة');
+function cityTimezone(name) {
+  const n = norm(name);
+  for (const [k, v] of Object.entries(CITY_TZ)) if (norm(k) === n) return v;
+  if (/^[A-Za-z]+\/[A-Za-z_]+$/.test(name.trim())) {
+    try { new Intl.DateTimeFormat('en', { timeZone: name.trim() }); return name.trim(); } catch {}
+  }
+  return null;
+}
+
 function command(raw) {
   const text = raw.trim();
   const t = text.replace(/[إأآ]/g, 'ا');
@@ -31,6 +54,7 @@ function command(raw) {
   if (/^(الكرت|كرت|card)$/i.test(t)) return { cmd: 'card' };
   if (/^(ايقاف العروض|stop)$/i.test(t)) return { cmd: 'optout' };
   let m;
+  if ((m = text.match(/^(?:توقيت|المدينة|مدينة)\s+(.+)$/))) return { cmd: 'timezone', tz: cityTimezone(m[1]), name: m[1].trim() };
   if ((m = text.match(/^حذف\s+موقع\s+(.+)$/))) return { cmd: 'removeLocation', name: m[1] };
   if ((m = text.match(/^حذف\s+(.+)$/))) return { cmd: 'remove', text: m[1] };
   if (/^موقع\s*(البيت|المنزل)$/.test(t)) return { cmd: 'pendingLocation', name: 'البيت' };
@@ -70,4 +94,4 @@ async function splitItems(text) {
   }
 }
 
-module.exports = { command, splitItems, splitSimple, parseTime };
+module.exports = { command, splitItems, splitSimple, parseTime, cityTimezone };

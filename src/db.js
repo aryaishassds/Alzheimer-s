@@ -7,12 +7,20 @@ const COUNTRY_TZ = [
   ['+966', 'Asia/Riyadh'], ['+971', 'Asia/Dubai'], ['+965', 'Asia/Kuwait'],
   ['+974', 'Asia/Qatar'], ['+973', 'Asia/Bahrain'], ['+968', 'Asia/Muscat'],
   ['+970', 'Asia/Hebron'], ['+972', 'Asia/Jerusalem'], ['+962', 'Asia/Amman'],
-  ['+20', 'Africa/Cairo'], ['+1', 'America/Chicago'],
-];
+  ['+961', 'Asia/Beirut'], ['+963', 'Asia/Damascus'], ['+964', 'Asia/Baghdad'],
+  ['+967', 'Asia/Aden'], ['+249', 'Africa/Khartoum'], ['+218', 'Africa/Tripoli'],
+  ['+216', 'Africa/Tunis'], ['+213', 'Africa/Algiers'], ['+212', 'Africa/Casablanca'],
+  ['+20', 'Africa/Cairo'], ['+90', 'Europe/Istanbul'], ['+44', 'Europe/London'],
+  ['+49', 'Europe/Berlin'], ['+33', 'Europe/Paris'], ['+34', 'Europe/Madrid'],
+  ['+39', 'Europe/Rome'], ['+31', 'Europe/Amsterdam'], ['+46', 'Europe/Stockholm'],
+  ['+61', 'Australia/Sydney'], ['+52', 'America/Mexico_City'], ['+55', 'America/Sao_Paulo'],
+  ['+1', 'America/Chicago'],
+].sort((a, b) => b[0].length - a[0].length);
+const DEFAULT_TZ = process.env.DEFAULT_TIMEZONE || 'Asia/Jerusalem';
 function guessTimezone(phone) {
   const p = '+' + String(phone).replace(/\D/g, '');
   const hit = COUNTRY_TZ.find(([code]) => p.startsWith(code));
-  return hit ? hit[1] : 'UTC';
+  return hit ? hit[1] : DEFAULT_TZ;
 }
 const newId = (n = 8) => crypto.randomBytes(n).toString('hex');
 
@@ -45,19 +53,24 @@ async function createFamily(ownerPhone, ownerName) {
   return f;
 }
 
-async function getFamily(id) { return id ? kv.get(K.fam(id)) : null; }
+async function getFamily(id) {
+  const f = id ? await kv.get(K.fam(id)) : null;
+  if (f && (!f.timezone || f.timezone === 'UTC')) f.timezone = guessTimezone(f.ownerPhone); // older records
+  return f;
+}
 async function familyByPhone(p) { return getFamily(await kv.get(K.phone(p))); }
 async function familyBySerial(s) { return getFamily(await kv.get(K.serial(s))); }
 async function familyByJoinCode(c) { return getFamily(await kv.get(K.join(c))); }
 async function allFamilies() {
   const keys = await kv.keys('fam/');
-  return (await Promise.all(keys.map(k => kv.get(k)))).filter(Boolean);
+  return (await Promise.all(keys.map(k => getFamily(k.slice(4))))).filter(Boolean);
 }
 
 // Apply a change to the freshest copy of the family. fn returns false to cancel.
 async function updateFamily(id, fn) {
   return kv.update(K.fam(id), async f => {
     if (!f) return null;
+    if (!f.timezone || f.timezone === 'UTC') f.timezone = guessTimezone(f.ownerPhone);
     const r = await fn(f);
     if (r === false) return null;
     f.updatedAt = Date.now();

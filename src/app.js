@@ -41,6 +41,24 @@ if(/Android/i.test(ua)){$('a').style.display='none';$('ios').style.display='none
 else if(/iPhone|iPad/i.test(ua)){if($('g'))$('g').style.display='none';$('and').style.display='none'}</script></html>`);
 }
 
+// ---------- full list page ----------
+const escH = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+async function listPage(serial, t) {
+  const f = await db.familyBySerial(serial);
+  if (!f || !safeEq(t, f.authToken)) return text('Not found', 404);
+  const time = at => new Intl.DateTimeFormat('ar', { timeZone: f.timezone, hour: 'numeric', minute: '2-digit' }).format(new Date(at));
+  const rows = f.items.map((i, n) => `<li><span class="n">${n + 1}</span><span class="t">${escH(i.text)}</span><span class="m">${escH(f.names[i.by] || '')} · ${time(i.at)}</span></li>`).join('');
+  return html(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${cfg.brandName} – القائمة</title>
+<style>body{margin:0;font-family:system-ui,-apple-system;background:#f2f4f3;color:#14201e}
+header{background:#0f766e;color:#fff;padding:22px 18px}h1{margin:0;font-size:22px}.c{opacity:.85;margin-top:4px}
+ul{list-style:none;margin:0;padding:12px}li{background:#fff;border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.n{background:#e6f4f2;color:#0f766e;border-radius:50%;min-width:30px;height:30px;display:grid;place-items:center;font-weight:700}
+.t{flex:1;font-size:18px;font-weight:600}.m{color:#6b7a77;font-size:12px;white-space:nowrap}.e{text-align:center;padding:50px;color:#6b7a77}</style>
+<header><h1>🛒 طلبات البيت</h1><div class="c">${f.items.length} ${f.items.length === 1 ? 'غرض' : 'أغراض'}</div></header>
+${f.items.length ? `<ul>${rows}</ul>` : '<div class="e">القائمة فارغة ✨</div>'}</html>`);
+}
+
 // ---------- Stripe ----------
 function stripeVerify(raw, header = '') {
   if (!cfg.stripe.webhookSecret) return false;
@@ -67,6 +85,9 @@ async function handle(req) {
   // WhatsApp
   if (p === '/webhook' && m === 'GET') { const v = wa.verify(url.searchParams); return text(v.body, v.status); }
   if (p === '/webhook' && m === 'POST') return empty(await wa.webhook(await req.text(), req.headers.get('x-hub-signature-256') || ''));
+
+  // Full list page (linked from the back of the card)
+  if ((r = p.match(/^\/list\/([\w-]+)$/)) && m === 'GET') return listPage(r[1], url.searchParams.get('t') || '');
 
   // Card
   if ((r = p.match(/^\/card\/([\w-]+)$/)) && m === 'GET') return cardPage(r[1], url.searchParams.get('t') || '');
@@ -142,8 +163,9 @@ async function handle(req) {
     // Create a card for a phone number without WhatsApp (for testing the card first).
     if (p === '/admin/api/test-family' && m === 'POST') {
       const { phone, name = 'تجربة' } = await req.json();
-      const ph = String(phone || '').replace(/\D/g, '');
+      const ph = String(phone || '').replace(/\D/g, '').replace(/^00/, '');
       if (ph.length < 8) return json({ error: 'phone required' }, 400);
+      if (String(phone).trim().startsWith('0') && !String(phone).trim().startsWith('00')) return json({ error: 'اكتب الرقم مع مقدمة الدولة بدون الصفر، مثل 972501234567 أو 201001234567' }, 400);
       let f = await db.familyByPhone(ph);
       if (!f) f = await db.createFamily(ph, name);
       return json({ id: f.id, card: `${cfg.baseUrl}/card/${f.serial}?t=${f.authToken}` });

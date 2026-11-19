@@ -36,6 +36,7 @@ const HELP = `الأوامر:
 • إضافة موقع سوبرماركت ← ثم أرسل الموقع 📍 (حتى 5 مواقع)
 • حذف موقع سوبرماركت
 • وقت 5 مساء ← وقت التذكير (حتى 3 أوقات: وقت 1 م 5 م)
+• توقيت القاهرة ← ضبط توقيت مدينتك
 • الكرت ← رابط الكرت للمحفظة
 • ايقاف العروض`;
 
@@ -124,6 +125,10 @@ ${cardLink(target)}`);
     case 'time':
       await fam.setReminderTimes(f, cmd.times);
       return send(phone, `⏰ التذكير اليومي: ${cmd.times.join(' و ')} (فقط إذا وُجدت أغراض)`);
+    case 'timezone':
+      if (!cmd.tz) return send(phone, 'لم أتعرف على المدينة. جرّب مثلاً: توقيت القاهرة، توقيت القدس، توقيت الرياض، توقيت نيويورك');
+      await fam.change(f.id, x => { x.timezone = cmd.tz; });
+      return send(phone, `🕐 تم ضبط التوقيت على ${cmd.name}. الساعة عندك الآن ${new Intl.DateTimeFormat('ar', { timeZone: cmd.tz, hour: 'numeric', minute: '2-digit' }).format(new Date())}`);
     case 'optout':
       await db.updateFamily(f.id, x => { x.optInOffers = false; });
       return send(phone, 'تم إيقاف العروض.');

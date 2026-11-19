@@ -46,7 +46,12 @@ function passJson(family) {
         value: family.reminderTimes.join(' · ') || '—',
       }],
       backFields: [
-        { key: 'full', label: 'كل الطلبات', value: fullList },
+        {
+          key: 'open', label: 'القائمة كاملة',
+          value: `${cfg.baseUrl}/list/${family.serial}?t=${family.authToken}`,
+          attributedValue: `<a href="${cfg.baseUrl}/list/${family.serial}?t=${family.authToken}">اضغط هنا لعرض كل الطلبات (${family.items.length})</a>`,
+        },
+        { key: 'full', label: `كل الطلبات (${family.items.length})`, value: fullList },
         // changeMessage => iPhone shows a notification when this value changes
         { key: 'last', label: 'آخر إضافة', value: family.lastAdded || '—', changeMessage: '➕ أُضيف: %@' },
         { key: 'reminder', label: 'تذكير', value: family.reminderNote || '—', changeMessage: '%@' },
