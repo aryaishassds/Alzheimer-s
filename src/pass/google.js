@@ -36,23 +36,27 @@ async function accessToken() {
   return cachedToken.value;
 }
 
-const lang = v => ({ defaultValue: { language: 'ar', value: v } });
+const { t } = require('../i18n');
+const lang = (v, L = 'ar') => ({ defaultValue: { language: L, value: v } });
 
 function genericObject(family) {
+  const L = c.lang(family);
   const locs = c.activeLocations(family);
+  const next = c.nextEventShort(family);
   return {
     id: objectId(family),
     classId: classId(),
     state: 'ACTIVE',
-    hexBackgroundColor: '#0f766e',
+    hexBackgroundColor: process.env.CARD_BG_HEX || '#fff7d1',
     logo: { sourceUri: { uri: `${cfg.baseUrl}/assets/logo@3x.png` } },
-    cardTitle: lang(cfg.brandName),
-    header: lang(c.frontTitle(family)),
-    subheader: lang('طلبات البيت'),
+    cardTitle: lang(t(L, 'brand'), L),
+    header: lang(c.frontTitle(family), L),
+    subheader: lang(t(L, 'homeOrders'), L),
     textModulesData: [
-      { id: 'items', header: 'القائمة', body: c.hasItems(family) ? c.itemsLine(family, 12) : '—' },
-      { id: 'home', header: 'عند الوصول للبيت', body: c.locationText(family, { kind: 'home' }) },
-      { id: 'reminder', header: 'التذكير', body: family.reminderTimes.join(' · ') },
+      { id: 'items', header: t(L, 'list'), body: c.hasItems(family) ? c.itemsLine(family, 12) : '—' },
+      ...(next ? [{ id: 'event', header: t(L, 'nextEvent'), body: next }] : []),
+      { id: 'home', header: t(L, 'home'), body: c.locationText(family, { kind: 'home' }) },
+      { id: 'reminder', header: t(L, 'reminder'), body: family.reminderTimes.join(' · ') },
     ],
     // Nearby Passes notifications (Google decides the radius and text; max 10 locations).
     // Verify the field name against the current Google Wallet reference before launch.

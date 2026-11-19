@@ -3,47 +3,79 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>كرت الطلبات – طلبات البيت في محفظتك</title>
-<meta name="description" content="زوجتك ترسل طلبات البيت على واتساب، وتظهر في كرت بمحفظة هاتفك ويذكّرك عند الوصول للبيت. 2$ للسنة.">
+<title>كرت الطلبات – Home List</title>
+<meta name="description" content="Family sends home requests on WhatsApp, they show up on a card in your Wallet and remind you when you get home. $2 a year.">
 <style>
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:#f5f7f6;color:#14201e;line-height:1.7}
-.hero{background:#0f766e;color:#fff;text-align:center;padding:56px 20px 64px}
-.hero img{width:84px;border-radius:20px}
-h1{font-size:34px;margin:14px 0 6px}
-.hero p{font-size:18px;opacity:.92;max-width:520px;margin:0 auto}
-.price{display:inline-block;margin-top:18px;background:rgba(255,255,255,.15);padding:6px 16px;border-radius:999px;font-weight:700}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:#fffbea;color:#332e1c;line-height:1.7}
+.top{display:flex;justify-content:flex-end;padding:12px 16px}
+.top button{font:inherit;border:1px solid #e6d58a;background:#fff7d1;border-radius:999px;padding:6px 14px;cursor:pointer}
+.hero{text-align:center;padding:24px 20px 56px}
+.note{display:inline-block;background:#fff7d1;border:1px solid #efe3a6;border-radius:18px;box-shadow:0 10px 30px rgba(120,100,20,.12);padding:34px 28px;max-width:560px}
+.note img{width:84px;border-radius:20px}
+h1{font-size:32px;margin:14px 0 6px}
+.hero p{font-size:18px;color:#5c4f22;margin:0 auto}
+.price{display:inline-block;margin-top:18px;background:#fbe9a0;padding:6px 16px;border-radius:999px;font-weight:700}
 .cta{display:inline-block;margin-top:22px;background:#25d366;color:#062b16;font-weight:800;font-size:19px;padding:16px 30px;border-radius:14px;text-decoration:none}
-.wrap{max-width:900px;margin:0 auto;padding:40px 20px}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-.step{background:#fff;border-radius:16px;padding:18px;border:1px solid #e3e8e6}
-.step b{display:block;font-size:17px;margin-bottom:4px}
-.n{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#e6f4f2;color:#0f766e;font-weight:800;margin-bottom:8px}
+.wrap{max-width:920px;margin:0 auto;padding:10px 20px 40px}
 h2{text-align:center;margin:0 0 20px}
-footer{text-align:center;color:#6b7a77;font-size:13px;padding:30px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.step{background:#fff7d1;border-radius:16px;padding:18px;border:1px solid #efe3a6}
+.step b{display:block;font-size:17px;margin-bottom:4px}
+.n{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#fbe9a0;color:#6b5a1c;font-weight:800;margin-bottom:8px}
+footer{text-align:center;color:#856e24;font-size:13px;padding:30px}
+footer a{color:#856e24}
+[data-l]{display:none}
+html[lang=ar] [data-l=ar], html[lang=en] [data-l=en]{display:revert}
 </style>
 </head>
 <body>
+<div class="top"><button id="sw">English</button></div>
 <section class="hero">
-  <img src="/assets/logo@3x.png" alt="">
-  <h1>لا تنسَ طلبات البيت أبداً</h1>
-  <p>زوجتك ترسل الطلبات على واتساب، فتظهر فوراً في كرت داخل محفظة هاتفك، ويذكّرك عند وصولك للبيت.</p>
-  <div class="price">2$ للسنة كاملة · أول 7 أيام مجاناً</div><br>
-  <a class="cta" id="start" href="#">ابدأ الآن على واتساب</a>
-</section>
-<section class="wrap">
-  <h2>كيف يعمل؟</h2>
-  <div class="steps">
-    <div class="step"><span class="n">1</span><b>اضغط ابدأ</b>تصلك رسالة على واتساب فيها رابط الكرت.</div>
-    <div class="step"><span class="n">2</span><b>أضف الكرت</b>إلى Apple Wallet أو Google Wallet بضغطة واحدة.</div>
-    <div class="step"><span class="n">3</span><b>ادعُ زوجتك</b>ترسل "رز، خبز" على واتساب فيظهر في كرتك.</div>
-    <div class="step"><span class="n">4</span><b>يذكّرك</b>عند الوصول للبيت أو المرور بالسوبرماركت، أو في الساعة التي تختارها.</div>
+  <div class="note">
+    <img src="/assets/logo@3x.png" alt="">
+    <h1 data-l="ar">لا تنسَ طلبات البيت أبداً</h1>
+    <h1 data-l="en">Never forget what home needs</h1>
+    <p data-l="ar">عائلتك ترسل الطلبات والمناسبات على واتساب، فتظهر فوراً في كرت داخل محفظة هاتفك، ويذكّرك عند وصولك للبيت.</p>
+    <p data-l="en">Your family texts the list and important dates on WhatsApp. It appears instantly on a card in your phone's Wallet and reminds you when you get home.</p>
+    <div class="price" data-l="ar">2$ للسنة كاملة · أول 7 أيام مجاناً</div>
+    <div class="price" data-l="en">$2 for the whole year · first 7 days free</div><br>
+    <a class="cta" id="start" href="#"><span data-l="ar">ابدأ الآن على واتساب</span><span data-l="en">Start on WhatsApp</span></a>
   </div>
 </section>
-<footer>كرت الطلبات · بدون تطبيق · يعمل على آيفون وأندرويد</footer>
+<section class="wrap">
+  <h2 data-l="ar">كيف يعمل؟</h2><h2 data-l="en">How it works</h2>
+  <div class="steps">
+    <div class="step"><span class="n">1</span>
+      <span data-l="ar"><b>اضغط ابدأ</b>تصلك رسالة على واتساب فيها رابط الكرت.</span>
+      <span data-l="en"><b>Tap start</b>You get a WhatsApp message with your card link.</span></div>
+    <div class="step"><span class="n">2</span>
+      <span data-l="ar"><b>أضف الكرت</b>إلى Apple Wallet أو Google Wallet بضغطة واحدة.</span>
+      <span data-l="en"><b>Add the card</b>To Apple Wallet or Google Wallet in one tap.</span></div>
+    <div class="step"><span class="n">3</span>
+      <span data-l="ar"><b>ادعُ عائلتك</b>يرسلون "رز، خبز" أو "عيد ميلاد سارة 25/12" فيظهر في كرتك.</span>
+      <span data-l="en"><b>Invite your family</b>They send "milk, bread" or "Sara birthday 12/25" and it shows on your card.</span></div>
+    <div class="step"><span class="n">4</span>
+      <span data-l="ar"><b>يذكّرك</b>عند الوصول للبيت، أو قرب السوبرماركت، أو قبل المناسبة.</span>
+      <span data-l="en"><b>It reminds you</b>When you get home, near the store, or before the big day.</span></div>
+  </div>
+</section>
+<footer>
+  <span data-l="ar">بدون تطبيق · يعمل على آيفون وأندرويد · </span>
+  <span data-l="en">No app needed · iPhone and Android · </span>
+  <a href="/privacy.html"><span data-l="ar">سياسة الخصوصية</span><span data-l="en">Privacy Policy</span></a>
+</footer>
 <script>
-// ضع رقم البوت هنا (مقدمة الدولة + الرقم بدون + أو مسافات)
-var BOT_NUMBER = "15550001111";
-document.getElementById('start').href = 'https://wa.me/' + BOT_NUMBER + '?text=' + encodeURIComponent('ابدأ');
+// Bot number: country code + number, digits only
+var BOT_NUMBER = "15551857812";
+var html = document.documentElement;
+function setLang(l) {
+  html.lang = l; html.dir = l === 'ar' ? 'rtl' : 'ltr';
+  document.getElementById('sw').textContent = l === 'ar' ? 'English' : 'العربية';
+  document.getElementById('start').href = 'https://wa.me/' + BOT_NUMBER + '?text=' + encodeURIComponent(l === 'ar' ? 'ابدأ' : 'Hi');
+}
+var q = (location.hash || '').replace('#', '');
+setLang(q === 'en' || q === 'ar' ? q : (/^ar/i.test(navigator.language || '') ? 'ar' : 'en'));
+document.getElementById('sw').onclick = function () { setLang(html.lang === 'ar' ? 'en' : 'ar'); };
 </script>
 </body>
 </html>

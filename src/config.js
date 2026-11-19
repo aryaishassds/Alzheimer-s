@@ -33,6 +33,7 @@ const cfg = {
   priceUsd: Number(process.env.PRICE_USD || 2),
   trialDays: Number(process.env.TRIAL_DAYS || 7),
   brandName: process.env.BRAND_NAME || 'كرت الطلبات',
+  brandNameEn: process.env.BRAND_NAME_EN || 'Home List',
   adminToken: process.env.ADMIN_TOKEN || '',
   cronSecret: process.env.CRON_SECRET || '',
 

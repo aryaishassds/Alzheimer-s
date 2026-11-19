@@ -34,7 +34,7 @@ const K = {
   camp: () => `camp/${Date.now()}`,
 };
 
-async function createFamily(ownerPhone, ownerName) {
+async function createFamily(ownerPhone, ownerName, lang = 'ar') {
   const id = newId(6);
   const f = {
     id, serial: 'HL-' + newId(8), authToken: newId(16),
@@ -42,7 +42,7 @@ async function createFamily(ownerPhone, ownerName) {
     ownerPhone, members: [ownerPhone], names: { [ownerPhone]: ownerName || '' },
     items: [], lastAdded: '', locations: [], pendingLocation: null,
     reminderTimes: ['17:00'], clearAt: '00:00', timezone: guessTimezone(ownerPhone),
-    reminderNote: '', offerNote: '', lastRuns: {},
+    reminderNote: '', offerNote: '', eventNote: '', events: [], lang, lastRuns: {},
     status: 'trial', trialEnds: Date.now() + Number(process.env.TRIAL_DAYS || 7) * 864e5, paidUntil: 0,
     optInOffers: true, updatedAt: Date.now(), createdAt: Date.now(),
   };
@@ -104,6 +104,24 @@ async function devicesForSerial(serial) {
   return (await Promise.all(keys.map(k => kv.get(k)))).filter(Boolean);
 }
 
+// "Delete my account": the owner removes the whole family; a member only leaves it.
+async function deletePhone(phone) {
+  const f = await familyByPhone(phone);
+  if (!f) return;
+  if (f.ownerPhone !== phone) {
+    await kv.del(K.phone(phone));
+    await updateFamily(f.id, x => { x.members = x.members.filter(p => p !== phone); delete x.names[phone]; });
+    return;
+  }
+  const regs = await kv.keys(`reg/${f.serial}/`);
+  const devs = regs.map(k => k.split('/').pop());
+  await Promise.all([
+    ...f.members.map(p => kv.del(K.phone(p))),
+    kv.del(K.serial(f.serial)), kv.del(K.join(f.joinCode)), kv.del(K.fam(f.id)),
+    ...regs.map(k => kv.del(k)), ...devs.map(d => kv.del(K.dev(d, f.serial))),
+  ]);
+}
+
 async function logCampaign(c) { await kv.set(K.camp(), { ...c, at: Date.now() }); }
 async function campaigns() {
   const keys = (await kv.keys('camp/')).sort().reverse().slice(0, 50);
@@ -113,5 +131,5 @@ async function campaigns() {
 module.exports = {
   createFamily, getFamily, familyByPhone, familyBySerial, familyByJoinCode, allFamilies,
   updateFamily, addMember, register, unregister, serialsForDevice, devicesForSerial,
-  logCampaign, campaigns, guessTimezone,
+  logCampaign, campaigns, guessTimezone, deletePhone,
 };

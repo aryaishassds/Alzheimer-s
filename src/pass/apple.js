@@ -7,60 +7,62 @@ const c = require('./content');
 
 const assetBuffers = Object.fromEntries(Object.entries(require('./assets')).map(([k, v]) => [k, Buffer.from(v, 'base64')]));
 
-function localDate(family) {
-  return new Intl.DateTimeFormat('ar', { timeZone: family.timezone, weekday: 'long', day: 'numeric', month: 'short' })
-    .format(new Date());
+const { t, locale } = require('../i18n');
+const ev = require('../events');
+
+// Sticky-note colors (override with CARD_BG / CARD_FG / CARD_LABEL, e.g. "rgb(255, 247, 209)")
+const COLORS = {
+  bg: process.env.CARD_BG || 'rgb(255, 247, 209)',
+  fg: process.env.CARD_FG || 'rgb(51, 46, 28)',
+  label: process.env.CARD_LABEL || 'rgb(133, 110, 36)',
+};
+
+function localDate(f) {
+  return new Intl.DateTimeFormat(locale(c.lang(f)), { timeZone: f.timezone, weekday: 'long', day: 'numeric', month: 'short' }).format(new Date());
 }
 
 function passJson(family) {
-  const fullList = family.items.length
-    ? family.items.map((i, n) => `${n + 1}. ${i.text}`).join('\n')
-    : 'القائمة فارغة. أي رسالة تصل على واتساب ستظهر هنا.';
-
+  const L = c.lang(family);
+  const align = L === 'ar' ? 'PKTextAlignmentRight' : 'PKTextAlignmentLeft';
+  const brand = t(L, 'brand');
+  const fullList = family.items.length ? family.items.map((i, n) => `${n + 1}. ${i.text}`).join('\n') : t(L, 'emptyList');
   const placesList = family.locations.length
-    ? family.locations.map(l => (l.kind === 'home' ? '🏠 ' : '📍 ') + l.name).join('\n')
-    : 'لم تُضف مواقع بعد. أرسل "موقع البيت" على واتساب.';
+    ? family.locations.map(l => (l.kind === 'home' ? '🏠 ' + t(L, 'home') : '📍 ' + l.name)).join('\n')
+    : t(L, 'noPlaces');
+  const listUrl = `${cfg.baseUrl}/list/${family.serial}?t=${family.authToken}`;
+  const next = c.nextEventShort(family);
+
+  const aux = [{ key: 'next', label: t(L, 'reminder'), value: family.reminderTimes.join(' · ') || '—', textAlignment: align }];
+  if (next) aux.unshift({ key: 'event', label: t(L, 'nextEvent'), value: next, textAlignment: align });
 
   const json = {
     formatVersion: 1,
     passTypeIdentifier: cfg.apple.passTypeId,
     teamIdentifier: cfg.apple.teamId,
     serialNumber: family.serial,
-    organizationName: cfg.brandName,
-    description: cfg.brandName + ' – طلبات البيت',
-    logoText: cfg.brandName,
-    foregroundColor: 'rgb(255, 255, 255)',
-    backgroundColor: 'rgb(15, 118, 110)',
-    labelColor: 'rgb(204, 251, 241)',
+    organizationName: brand,
+    description: `${brand} – ${t(L, 'homeOrders')}`,
+    logoText: brand,
+    foregroundColor: COLORS.fg,
+    backgroundColor: COLORS.bg,
+    labelColor: COLORS.label,
     sharingProhibited: true,
     generic: {
-      headerFields: [{ key: 'date', label: 'اليوم', value: localDate(family), textAlignment: 'PKTextAlignmentNatural' }],
-      primaryFields: [{ key: 'count', label: 'طلبات البيت', value: c.frontTitle(family) }],
-      secondaryFields: [{
-        key: 'items', label: 'القائمة',
-        value: c.hasItems(family) ? c.itemsLine(family, 4) : '—',
-        textAlignment: 'PKTextAlignmentNatural',
-      }],
-      auxiliaryFields: [{
-        key: 'next', label: 'التذكير',
-        value: family.reminderTimes.join(' · ') || '—',
-      }],
+      headerFields: [{ key: 'date', label: t(L, 'today'), value: localDate(family), textAlignment: align }],
+      primaryFields: [{ key: 'count', label: t(L, 'homeOrders'), value: c.frontTitle(family) }],
+      secondaryFields: [{ key: 'items', label: t(L, 'list'), value: c.hasItems(family) ? c.itemsLine(family, 4) : '—', textAlignment: align }],
+      auxiliaryFields: aux,
       backFields: [
-        {
-          key: 'open', label: 'القائمة كاملة',
-          value: `${cfg.baseUrl}/list/${family.serial}?t=${family.authToken}`,
-          attributedValue: `<a href="${cfg.baseUrl}/list/${family.serial}?t=${family.authToken}">اضغط هنا لعرض كل الطلبات (${family.items.length})</a>`,
-        },
-        { key: 'full', label: `كل الطلبات (${family.items.length})`, value: fullList },
-        // changeMessage => iPhone shows a notification when this value changes
-        { key: 'last', label: 'آخر إضافة', value: family.lastAdded || '—', changeMessage: '➕ أُضيف: %@' },
-        { key: 'reminder', label: 'تذكير', value: family.reminderNote || '—', changeMessage: '%@' },
-        { key: 'offer', label: 'عروض', value: family.offerNote || '—', changeMessage: '%@' },
-        { key: 'places', label: 'المواقع', value: placesList },
-        {
-          key: 'help', label: 'أوامر واتساب',
-          value: 'مسح · حذف خبز · موقع البيت · إضافة موقع سوبرماركت · وقت 5 مساء · مساعدة',
-        },
+        { key: 'open', label: t(L, 'fullListLabel'), value: listUrl, attributedValue: `<a href="${listUrl}">${t(L, 'fullListLink', family.items.length)}</a>` },
+        { key: 'full', label: t(L, 'allOrders', family.items.length), value: fullList },
+        // changeMessage => the iPhone shows a notification when this value changes
+        { key: 'last', label: t(L, 'lastAdded'), value: family.lastAdded || '—', changeMessage: t(L, 'added') },
+        { key: 'reminder', label: t(L, 'reminderLabel'), value: family.reminderNote || '—', changeMessage: '%@' },
+        { key: 'eventNote', label: '🔔', value: family.eventNote || '—', changeMessage: '%@' },
+        { key: 'events', label: t(L, 'events'), value: c.eventsBlock(family) },
+        { key: 'offer', label: t(L, 'offers'), value: family.offerNote || '—', changeMessage: '%@' },
+        { key: 'places', label: t(L, 'places'), value: placesList },
+        { key: 'help', label: t(L, 'commandsLabel'), value: t(L, 'commandsShort') },
       ],
     },
   };
@@ -71,8 +73,16 @@ function passJson(family) {
   }
 
   const locs = c.activeLocations(family);
-  if (locs.length) {
-    json.locations = locs.map(l => ({ latitude: l.lat, longitude: l.lng, relevantText: c.locationText(family, l) }));
+  if (locs.length) json.locations = locs.map(l => ({ latitude: l.lat, longitude: l.lng, relevantText: c.locationText(family, l) }));
+
+  // Upcoming events surface the card on the lock screen around their time.
+  const soon = ev.upcoming(family.events, family.timezone).slice(0, 10);
+  if (soon.length) {
+    json.relevantDate = new Date(ev.eventStart(soon[0], family.timezone)).toISOString();
+    json.relevantDates = soon.map(e => ({
+      startDate: new Date(ev.eventStart(e, family.timezone) - (e.time ? e.lead * 3600e3 : 0)).toISOString(),
+      endDate: new Date(ev.eventEnd(e, family.timezone)).toISOString(),
+    }));
   }
   return json;
 }

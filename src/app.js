@@ -9,6 +9,8 @@ const wa = require('./whatsapp');
 const fam = require('./family');
 const scheduler = require('./scheduler');
 const { isActive } = require('./pass/content');
+const ev = require('./events');
+const { t, locale } = require('./i18n');
 
 const text = (body, status = 200, headers = {}) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', ...headers } });
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
@@ -16,47 +18,60 @@ const html = body => new Response(body, { headers: { 'content-type': 'text/html;
 const empty = status => new Response(null, { status });
 const pkpass = (buf, extra = {}) => new Response(buf, { headers: { 'content-type': 'application/vnd.apple.pkpass', ...extra } });
 
+const escH = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const safeEq = (a = '', b = '') => a.length === b.length && a.length > 0 && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 // ---------- card landing page ----------
-async function cardPage(serial, t) {
+const CARD_PAGE = {
+  ar: { lead: 'أضف الكرت لمحفظتك، وكل طلبات البيت تظهر عليه.', apple: ' إضافة إلى Apple Wallet', google: 'إضافة إلى Google Wallet', after: 'بعد الإضافة (مرة واحدة):',
+    ios: 'آيفون: الإعدادات ← الخصوصية والأمان ← خدمات الموقع ← Wallet ← تفعيل. ثم افتح الكرت ← ⋯ ← فعّل الإشعارات.',
+    and: 'أندرويد: Google Wallet ← الإعدادات ← فعّل الإشعارات و Nearby passes، واسمح بالموقع الدقيق دائماً.' },
+  en: { lead: 'Add the card to your Wallet. Everything your family sends shows up on it.', apple: ' Add to Apple Wallet', google: 'Add to Google Wallet', after: 'After adding (one time):',
+    ios: 'iPhone: Settings → Privacy & Security → Location Services → Wallet → While Using. Then open the card → ⋯ → turn on Notifications.',
+    and: 'Android: Google Wallet → Settings → turn on Notifications and Nearby passes, and allow precise location all the time.' },
+};
+async function cardPage(serial, tok) {
   const f = await db.familyBySerial(serial);
-  if (!f || !safeEq(t, f.authToken)) return text('Not found', 404);
+  if (!f || !safeEq(tok, f.authToken)) return text('Not found', 404);
+  const L = f.lang === 'en' ? 'en' : 'ar';
+  const P = CARD_PAGE[L];
   const g = google.saveUrl(f);
   const applePath = `/card/${f.serial}/pass.pkpass?t=${f.authToken}`;
-  return html(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>${cfg.brandName}</title>
-<style>body{font-family:system-ui;background:#0f766e;color:#fff;text-align:center;padding:40px 20px;margin:0}
+  return html(`<!doctype html><html lang="${L}" dir="${t(L, 'dir')}"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>${escH(t(L, 'brand'))}</title>
+<style>body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma;background:#fff7d1;color:#332e1c;text-align:center;padding:40px 20px;margin:0}
 a.b{display:block;max-width:320px;margin:14px auto;padding:15px;border-radius:12px;background:#000;color:#fff;text-decoration:none;font-weight:700;font-size:17px}
-a.g{background:#fff;color:#000}.m{opacity:.85;font-size:15px;line-height:1.7}.box{background:rgba(255,255,255,.12);border-radius:14px;padding:14px;max-width:340px;margin:24px auto;text-align:right;font-size:14px;line-height:1.9}</style>
-<img src="/assets/logo@3x.png" width="76" alt=""><h1>${cfg.brandName}</h1>
-<p class="m">أضف الكرت لمحفظتك، وكل طلبات البيت تظهر عليه.</p>
-<a class="b" id="a" href="${applePath}"> إضافة إلى Apple Wallet</a>
-${g ? `<a class="b g" id="g" href="${g}">إضافة إلى Google Wallet</a>` : ''}
-<div class="box"><b>بعد الإضافة (مرة واحدة):</b><br>
-<span id="ios">آيفون: الإعدادات ← الخصوصية والأمان ← خدمات الموقع ← Wallet ← تفعيل. ثم افتح الكرت ← ⋯ ← فعّل الإشعارات.</span>
-<span id="and">أندرويد: Google Wallet ← الإعدادات ← فعّل الإشعارات و Nearby passes، واسمح بالموقع الدقيق دائماً.</span></div>
+a.g{background:#fff;color:#000;border:1px solid #ddd}.m{color:#6b5a1c;font-size:15px;line-height:1.7}
+.box{background:#fffbea;border:1px solid #efe3a6;border-radius:14px;padding:14px;max-width:340px;margin:24px auto;text-align:start;font-size:14px;line-height:1.9}</style>
+<img src="/assets/logo@3x.png" width="76" alt=""><h1>${escH(t(L, 'brand'))}</h1>
+<p class="m">${P.lead}</p>
+<a class="b" id="a" href="${applePath}">${P.apple}</a>
+${g ? `<a class="b g" id="g" href="${g}">${P.google}</a>` : ''}
+<div class="box"><b>${P.after}</b><br><span id="ios">${P.ios}</span><span id="and">${P.and}</span></div>
 <script>var ua=navigator.userAgent,$=function(i){return document.getElementById(i)};
 if(/Android/i.test(ua)){$('a').style.display='none';$('ios').style.display='none'}
 else if(/iPhone|iPad/i.test(ua)){if($('g'))$('g').style.display='none';$('and').style.display='none'}</script></html>`);
 }
 
 // ---------- full list page ----------
-const escH = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-async function listPage(serial, t) {
+async function listPage(serial, tok) {
   const f = await db.familyBySerial(serial);
-  if (!f || !safeEq(t, f.authToken)) return text('Not found', 404);
-  const time = at => new Intl.DateTimeFormat('ar', { timeZone: f.timezone, hour: 'numeric', minute: '2-digit' }).format(new Date(at));
+  if (!f || !safeEq(tok, f.authToken)) return text('Not found', 404);
+  const L = f.lang || 'ar';
+  const time = at => new Intl.DateTimeFormat(locale(L), { timeZone: f.timezone, hour: 'numeric', minute: '2-digit' }).format(new Date(at));
   const rows = f.items.map((i, n) => `<li><span class="n">${n + 1}</span><span class="t">${escH(i.text)}</span><span class="m">${escH(f.names[i.by] || '')} · ${time(i.at)}</span></li>`).join('');
-  return html(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${cfg.brandName} – القائمة</title>
-<style>body{margin:0;font-family:system-ui,-apple-system;background:#f2f4f3;color:#14201e}
-header{background:#0f766e;color:#fff;padding:22px 18px}h1{margin:0;font-size:22px}.c{opacity:.85;margin-top:4px}
-ul{list-style:none;margin:0;padding:12px}li{background:#fff;border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
-.n{background:#e6f4f2;color:#0f766e;border-radius:50%;min-width:30px;height:30px;display:grid;place-items:center;font-weight:700}
-.t{flex:1;font-size:18px;font-weight:600}.m{color:#6b7a77;font-size:12px;white-space:nowrap}.e{text-align:center;padding:50px;color:#6b7a77}</style>
-<header><h1>🛒 طلبات البيت</h1><div class="c">${f.items.length} ${f.items.length === 1 ? 'غرض' : 'أغراض'}</div></header>
-${f.items.length ? `<ul>${rows}</ul>` : '<div class="e">القائمة فارغة ✨</div>'}</html>`);
+  const evs = ev.upcoming(f.events, f.timezone).map(e => `<li><span class="t">${escH(ev.label(e, L))}</span><span class="m">${escH(ev.whenText(e, L, f.timezone))}</span></li>`).join('');
+  return html(`<!doctype html><html lang="${L}" dir="${t(L, 'dir')}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escH(t(L, 'brand'))}</title>
+<style>body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma;background:#fffbea;color:#332e1c}
+header{background:#fff7d1;border-bottom:1px solid #efe3a6;padding:22px 18px}h1{margin:0;font-size:22px}.c{color:#856e24;margin-top:4px}
+h2{font-size:15px;color:#856e24;margin:18px 16px 0}
+ul{list-style:none;margin:0;padding:12px}li{background:#fff7d1;border:1px solid #f1e6ad;border-radius:12px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.n{background:#f5e7a1;color:#6b5a1c;border-radius:50%;min-width:30px;height:30px;display:grid;place-items:center;font-weight:700}
+.t{flex:1;font-size:18px;font-weight:600}.m{color:#8a7d55;font-size:12px;white-space:nowrap}.e{text-align:center;padding:40px;color:#8a7d55}</style>
+<header><h1>📝 ${escH(t(L, 'homeOrders'))}</h1><div class="c">${escH(t(L, 'count', f.items.length))}</div></header>
+${f.items.length ? `<ul>${rows}</ul>` : `<div class="e">${escH(t(L, 'listEmpty'))}</div>`}
+${evs ? `<h2>📅 ${escH(t(L, 'events'))}</h2><ul>${evs}</ul>` : ''}</html>`);
 }
 
 // ---------- Stripe ----------
@@ -134,7 +149,7 @@ async function handle(req) {
       const f = await db.getFamily(ev.data.object.client_reference_id);
       if (f) {
         const updated = await db.updateFamily(f.id, x => { x.status = 'paid'; x.paidUntil = Math.max(Date.now(), x.paidUntil || 0) + 365 * 864e5; });
-        await wa.send(f.ownerPhone, `✅ تم الدفع. اشتراكك فعّال حتى ${new Date(updated.paidUntil).toLocaleDateString('ar')}. شكراً لك!`);
+        await wa.send(f.ownerPhone, t(f.lang || 'ar', 'paid', new Date(updated.paidUntil).toLocaleDateString(locale(f.lang || 'ar'))));
       }
     }
     return empty(200);
@@ -175,7 +190,7 @@ async function handle(req) {
       const { phone, text: t } = await req.json();
       const f = await db.familyByPhone(String(phone || '').replace(/\D/g, ''));
       if (!f) return json({ error: 'not found' }, 404);
-      await fam.addItems(f, String(t || '').split(/[،,\n]/), f.ownerPhone);
+      await fam.addItems(f, require('./parse').splitSimple(String(t || '')), f.ownerPhone);
       return json({ ok: true });
     }
     if (p === '/admin/api/campaigns' && m === 'GET') return json(await db.campaigns());
