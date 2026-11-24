@@ -178,16 +178,27 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
 }
 
 // ---------- scheduling ----------
+const undated = e => !e.y || !e.m || !e.d;
+
+// Saved exactly as typed from the menu, even when no date could be read.
+function rawEvent(text, parsed) {
+  const base = parsed || { id: crypto.randomBytes(3).toString('hex'), kind: 'note', emoji: '📝', title: '', time: null, yearly: false, lead: 1, sent: {}, createdAt: Date.now() };
+  return { ...base, raw: String(text).trim() };
+}
+
 function eventStart(e, tz) {
+  if (undated(e)) return Infinity;
   const [hh, mm] = e.time ? e.time.split(':').map(Number) : [9, 0];
   return zonedToUtc(e.y, e.m, e.d, hh, mm, tz);
 }
 function eventEnd(e, tz) {
+  if (undated(e)) return Infinity;
   return e.time ? eventStart(e, tz) + 3 * 3600e3 : zonedToUtc(e.y, e.m, e.d, 23, 59, tz);
 }
 
 // When to notify, as [key, epochMs, kind]
 function triggers(e, tz) {
+  if (undated(e)) return [];
   if (e.kind === 'reminder') return [['at', eventStart(e, tz), 'now']];
   const out = [];
   const prev = new Date(Date.UTC(e.y, e.m - 1, e.d - 1));
@@ -200,6 +211,7 @@ function triggers(e, tz) {
 }
 
 function label(e, lang) {
+  if (e.raw) return e.raw;
   const fallback = lang === 'ar' ? 'مناسبة' : 'Event';
   return `${e.emoji} ${e.title || fallback}`;
 }
@@ -213,7 +225,17 @@ function whenText(e, lang, tz, { withWeekday = true } = {}) {
 }
 
 function upcoming(events, tz, now = Date.now()) {
-  return (events || []).filter(e => eventEnd(e, tz) > now).sort((a, b) => eventStart(a, tz) - eventStart(b, tz));
+  return (events || []).filter(e => eventEnd(e, tz) > now).sort((a, b) => {
+    const x = eventStart(a, tz), y = eventStart(b, tz);
+    return x === y ? (a.createdAt || 0) - (b.createdAt || 0) : x - y;
+  });
+}
+
+// How an event is shown: as typed when it came from the menu, else name · date.
+function display(e, lang, tz, opts = {}) {
+  if (e.raw) return e.raw;
+  if (undated(e)) return label(e, lang);
+  return `${label(e, lang)} · ${whenText(e, lang, tz, opts)}`;
 }
 
 // Roll yearly events forward and drop finished one-off events. Returns true if changed.
@@ -221,7 +243,7 @@ function housekeeping(f, now = Date.now()) {
   let changed = false;
   const keep = [];
   for (const e of f.events || []) {
-    if (eventEnd(e, f.timezone) > now) { keep.push(e); continue; }
+    if (undated(e) || eventEnd(e, f.timezone) > now) { keep.push(e); continue; }
     changed = true;
     if (e.yearly) { e.y += 1; if (!validDate(e.y, e.m, e.d)) e.d = 28; e.sent = {}; keep.push(e); }
   }
@@ -229,4 +251,4 @@ function housekeeping(f, now = Date.now()) {
   return changed;
 }
 
-module.exports = { parseEvent, triggers, label, whenText, upcoming, housekeeping, eventStart, eventEnd, zonedToUtc, tzParts };
+module.exports = { parseEvent, rawEvent, display, undated, triggers, label, whenText, upcoming, housekeeping, eventStart, eventEnd, zonedToUtc, tzParts };

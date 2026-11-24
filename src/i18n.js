@@ -57,6 +57,8 @@ const STR = {
     tasksList: list => (list ? `✅ المهام:\n${list}\n\nعند الإنجاز اكتب: تم 1` : 'لا توجد مهام ✨'),
     reminderNow: e => `⏰ تذكير: ${e}`,
     reminderSet: (e, when) => `⏰ سأذكّرك: ${e} · ${when}`,
+    eventSaved: e => `📅 تم الحفظ: ${e}`,
+    reminderSaved: e => `⏰ تم الحفظ: ${e}`,
     // menu
     menuBody: 'شو بدك تضيف؟ اختر من القائمة 👇',
     menuButton: 'الخيارات',
@@ -182,6 +184,8 @@ const STR = {
     tasksList: list => (list ? `✅ Tasks:\n${list}\n\nWhen finished send: done 1` : 'No tasks ✨'),
     reminderNow: e => `⏰ Reminder: ${e}`,
     reminderSet: (e, when) => `⏰ I'll remind you: ${e} · ${when}`,
+    eventSaved: e => `📅 Saved: ${e}`,
+    reminderSaved: e => `⏰ Saved: ${e}`,
     menuBody: 'What would you like to add? Pick an option 👇',
     menuButton: 'Options',
     menuSection: 'Add',

@@ -81,7 +81,7 @@ function passJson(family, { withStrip = false } = {}) {
   if (locs.length) json.locations = locs.map(l => ({ latitude: l.lat, longitude: l.lng, relevantText: c.locationText(family, l) }));
 
   // Upcoming events surface the card on the lock screen around their time.
-  const soon = ev.upcoming(family.events, family.timezone).slice(0, 10);
+  const soon = ev.upcoming(family.events, family.timezone).filter(e => !ev.undated(e)).slice(0, 10);
   if (soon.length) {
     json.relevantDate = new Date(ev.eventStart(soon[0], family.timezone)).toISOString();
     json.relevantDates = soon.map(e => ({

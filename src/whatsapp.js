@@ -124,7 +124,7 @@ async function handle(msg, contactName) {
     case 'list': return send(phone, f.items.length ? f.items.map((i, n) => `${n + 1}. ${i.text}`).join('\n') : t(L, 'listEmpty'));
     case 'events': {
       const list = ev.upcoming(f.events, f.timezone)
-        .map((e, i) => `${i + 1}. ${ev.label(e, L)} – ${ev.whenText(e, L, f.timezone)}${e.yearly ? ' · ' + t(L, 'yearly') : ''}`).join('\n');
+        .map((e, i) => `${i + 1}. ${ev.display(e, L, f.timezone)}${e.yearly && !e.raw ? ' · ' + t(L, 'yearly') : ''}`).join('\n');
       return send(phone, t(L, 'eventsList', list));
     }
     case 'removeEvent': {
@@ -166,7 +166,8 @@ async function handle(msg, contactName) {
     switch (st.mode) {
       case 'item': {
         await db.clearState(phone);
-        const items = await splitItems(text);
+        // From the menu: keep exactly what was typed, only split lines / commas.
+        const items = text.split(/\n|،|,|؛/).map(x => x.trim()).filter(Boolean);
         if (items.length) await fam.addItems(f, items, phone);
         return send(phone, t(L, 'itemsAdded', items.join(L === 'ar' ? '، ' : ', ')));
       }
@@ -176,18 +177,19 @@ async function handle(msg, contactName) {
         return x ? send(phone, t(L, 'taskAdded', x.text)) : markRead(msg.id);
       }
       case 'event': {
-        const e = ev.parseEvent(text, opts);
-        if (!e) return send(phone, t(L, 'needDate'));
+        // From the menu: saved as typed. If a date is readable it also gets reminders.
+        const e = ev.rawEvent(text, ev.parseEvent(text, opts));
         await db.clearState(phone);
         await fam.addEvent(f, e);
-        return send(phone, t(L, e.kind === 'reminder' ? 'reminderSet' : 'eventAdded', e.kind === 'reminder' ? (e.title || ev.label(e, L)) : ev.label(e, L), ev.whenText(e, L, f.timezone)));
+        return send(phone, t(L, 'eventSaved', e.raw) + (ev.undated(e) ? '' : `\n🔔 ${ev.whenText(e, L, f.timezone)}`));
       }
       case 'reminder': {
-        const e = ev.parseEvent(text, { ...opts, allowTimeOnly: true, forceKind: 'reminder' });
-        if (!e) return send(phone, t(L, 'needTime'));
+        const parsed = ev.parseEvent(text, { ...opts, allowTimeOnly: true, forceKind: 'reminder' });
+        const e = ev.rawEvent(text, parsed);
+        if (!parsed) { e.kind = 'reminder'; e.emoji = '⏰'; }
         await db.clearState(phone);
         await fam.addEvent(f, e);
-        return send(phone, t(L, e.kind === 'reminder' ? 'reminderSet' : 'eventAdded', e.kind === 'reminder' ? (e.title || ev.label(e, L)) : ev.label(e, L), ev.whenText(e, L, f.timezone)));
+        return send(phone, t(L, 'reminderSaved', e.raw) + (ev.undated(e) ? '' : `\n🔔 ${ev.whenText(e, L, f.timezone)}`));
       }
       case 'placeName': {
         await db.clearState(phone);
@@ -230,7 +232,7 @@ async function onChoice(f, phone, id, L) {
       const fresh = await db.getFamily(f.id);
       const items = fresh.items.length ? fresh.items.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : t(L, 'none');
       const tasks = (fresh.tasks || []).length ? fresh.tasks.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : t(L, 'none');
-      const evs = ev.upcoming(fresh.events, fresh.timezone).map((e, i) => `${i + 1}. ${ev.label(e, L)} – ${ev.whenText(e, L, fresh.timezone)}`).join('\n') || t(L, 'none');
+      const evs = ev.upcoming(fresh.events, fresh.timezone).map((e, i) => `${i + 1}. ${ev.display(e, L, fresh.timezone)}`).join('\n') || t(L, 'none');
       return send(phone, t(L, 'overview', items, tasks, evs));
     }
     case 'm:clear': await fam.clear(f); return send(phone, t(L, 'cleared'));

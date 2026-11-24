@@ -32,13 +32,13 @@ function nextEvent(f) { return ev.upcoming(f.events, f.timezone)[0] || null; }
 function nextEventShort(f) {
   const e = nextEvent(f);
   if (!e) return null;
-  return `${ev.label(e, lang(f))} · ${ev.whenText(e, lang(f), f.timezone, { withWeekday: false })}`;
+  return ev.display(e, lang(f), f.timezone, { withWeekday: false });
 }
 
 function eventsBlock(f) {
   const list = ev.upcoming(f.events, f.timezone);
   if (!list.length) return t(lang(f), 'noEvents');
-  return list.map((e, i) => `${i + 1}. ${ev.label(e, lang(f))}\n   ${ev.whenText(e, lang(f), f.timezone)}${e.yearly ? ' · ' + t(lang(f), 'yearly') : ''}`).join('\n');
+  return list.map((e, i) => `${i + 1}. ${ev.display(e, lang(f), f.timezone)}${e.yearly && !e.raw ? ' · ' + t(lang(f), 'yearly') : ''}`).join('\n');
 }
 
 function tasksLine(f, max = 4) {

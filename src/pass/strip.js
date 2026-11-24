@@ -55,7 +55,7 @@ function buildSections(f, ctx, maxW) {
 
 
   const evs = ev.upcoming(f.events, f.timezone).map(e =>
-    `${noEmoji(e.title || ev.label(e, L))} · ${ev.whenText(e, L, f.timezone, { withWeekday: true })}`);
+    noEmoji(e.raw || ev.undated(e) ? ev.display(e, L, f.timezone) : `${e.title || ev.label(e, L)} · ${ev.whenText(e, L, f.timezone, { withWeekday: true })}`));
   if (evs.length) sections.push({ title: `${t(L, 'events')} (${evs.length})`, lines: evs, total: evs.length, priority: 2 });
   const tasks = (f.tasks || []).map(x => noEmoji(x.text));
   if (tasks.length) sections.push({ title: `${t(L, 'tasks')} (${tasks.length})`, lines: wrap(ctx, tasks, sepText, maxW), total: tasks.length, priority: 3 });

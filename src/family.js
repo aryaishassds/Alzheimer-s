@@ -143,7 +143,9 @@ async function addEvent(fam, e) {
     added = e;
     const L = c.lang(f);
     // shows on the iPhone as a notification, so the sender sees how the date was understood
-    f.eventNote = `${e.kind === 'reminder' ? t(L, 'reminderSet', e.title || ev.label(e, L), ev.whenText(e, L, f.timezone)) : t(L, 'eventAdded', ev.label(e, L), ev.whenText(e, L, f.timezone))} · ${timeLabel(f)}`;
+    f.eventNote = e.raw
+      ? `${t(L, e.kind === 'reminder' ? 'reminderSaved' : 'eventSaved', e.raw)} · ${timeLabel(f)}`
+      : `${e.kind === 'reminder' ? t(L, 'reminderSet', e.title || ev.label(e, L), ev.whenText(e, L, f.timezone)) : t(L, 'eventAdded', ev.label(e, L), ev.whenText(e, L, f.timezone))} · ${timeLabel(f)}`;
     return f.eventNote;
   });
   return added;
@@ -169,8 +171,8 @@ const eventNotify = (fam, eventId, kind) => change(fam.id, f => {
   if (!e) return false;
   const L = c.lang(f);
   const name = ev.label(e, L);
-  const when = e.time ? ` · ${ev.whenText(e, L, f.timezone, { withWeekday: false })}` : '';
-  const text = kind === 'now' ? t(L, 'reminderNow', e.title || name)
+  const when = e.time && !e.raw ? ` · ${ev.whenText(e, L, f.timezone, { withWeekday: false })}` : '';
+  const text = kind === 'now' ? t(L, 'reminderNow', e.raw || e.title || name)
     : kind === 'tomorrow' ? t(L, 'eventTomorrow', name + when)
     : kind === 'today' ? t(L, 'eventToday', name + when)
     : t(L, 'eventSoon', name, e.lead);

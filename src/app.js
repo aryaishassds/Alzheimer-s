@@ -61,7 +61,7 @@ async function listPage(serial, tok) {
   const time = at => new Intl.DateTimeFormat(locale(L), { timeZone: f.timezone, hour: 'numeric', minute: '2-digit' }).format(new Date(at));
   const rows = f.items.map((i, n) => `<li><span class="n">${n + 1}</span><span class="t">${escH(i.text)}</span><span class="m">${escH(f.names[i.by] || '')} · ${time(i.at)}</span></li>`).join('');
   const tasks = (f.tasks || []).map((x, n) => `<li><span class="n">${n + 1}</span><span class="t">${escH(x.text)}</span><span class="m">${escH(f.names[x.by] || '')}</span></li>`).join('');
-  const evs = ev.upcoming(f.events, f.timezone).map(e => `<li><span class="t">${escH(ev.label(e, L))}</span><span class="m">${escH(ev.whenText(e, L, f.timezone))}</span></li>`).join('');
+  const evs = ev.upcoming(f.events, f.timezone).map(e => `<li><span class="t">${escH(e.raw ? e.raw : ev.label(e, L))}</span><span class="m">${escH(e.raw || ev.undated(e) ? '' : ev.whenText(e, L, f.timezone))}</span></li>`).join('');
   return html(`<!doctype html><html lang="${L}" dir="${t(L, 'dir')}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escH(t(L, 'brand'))}</title>
 <style>body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma;background:#fffbea;color:#332e1c}
