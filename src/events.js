@@ -22,6 +22,17 @@ const MONTHS = [
 const monthAlternation = MONTHS.flat().sort((a, b) => b.length - a.length).map(s => s.replace(/ /g, '\\s+')).join('|');
 const monthIndex = name => MONTHS.findIndex(list => list.some(n => n.toLowerCase() === name.toLowerCase().replace(/\s+/g, ' ')));
 
+const WEEKDAYS = [
+  ['الأحد', 'الاحد', 'احد', 'sunday', 'sun'],
+  ['الاثنين', 'الإثنين', 'اثنين', 'monday', 'mon'],
+  ['الثلاثاء', 'الثلاثا', 'ثلاثاء', 'tuesday', 'tue'],
+  ['الأربعاء', 'الاربعاء', 'اربعاء', 'wednesday', 'wed'],
+  ['الخميس', 'خميس', 'thursday', 'thu'],
+  ['الجمعة', 'الجمعه', 'جمعة', 'جمعه', 'friday', 'fri'],
+  ['السبت', 'سبت', 'saturday', 'sat'],
+];
+const WEEKDAY_RE = new RegExp(`(?:يوم\\s+|on\\s+|this\\s+)?(${WEEKDAYS.flat().sort((a, b) => b.length - a.length).join('|')})(?![\\w\\u0600-\\u06FF])`, 'i');
+
 const KINDS = [
   { kind: 'birthday', emoji: '🎂', yearly: true, re: /عيد\s*ميلاد|ميلاد|birthday|bday/i },
   { kind: 'anniversary', emoji: '💐', yearly: true, re: /ذكرى|anniversary/i },
@@ -53,7 +64,7 @@ const validDate = (y, m, d) => m >= 1 && m <= 12 && d >= 1 && d <= new Date(Date
 
 // ---------- parsing ----------
 const EXPLICIT = /^\s*(مناسب[ةه]|تذكير|ذكرني|ذكّرني|event|remind|reminder)(?=\s|$|[:،,])/i;
-const UNITS = /كيلو|كغ|كجم|غرام|جرام|جم|لتر|ليتر|علب[ةه]?|حب[ةه]|كيس|كرتون[ةه]?|ربطة|\bkg\b|\blb\b|\boz\b|\bg\b|liter|litre|gallon|pack|bag|box|dozen/i;
+const UNITS = /(?<![\u0600-\u06FF\w])(?:كيلو|كغ|كجم|غرام|جرام|غم|جم|لتر|ليتر|علب[ةه]?|حب[ةه]|حبات|كيس|اكياس|كرتون[ةه]?|ربط[ةه]|kg|lb|lbs|oz|g|liters?|litres?|gallons?|packs?|bags?|box(?:es)?|dozen)(?![\u0600-\u06FF\w])/i;
 
 const REMIND = /^\s*(ذكرني|ذكّرني|تذكير|نبهني|remind\s*me|reminder)(?=\s|$|[:،,])/i;
 
@@ -62,7 +73,7 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
   if (UNITS.test(raw) && !EXPLICIT.test(raw)) return null;
   let text = toLatin(raw).trim();
   const today = tzParts(tz);
-  let y, m, d, explicitYear = false, rel = null;
+  let y, m, d, explicitYear = false, rel = null, weekdayHit = null;
   const cut = re => { text = text.replace(re, ' '); };
 
   let r;
@@ -73,7 +84,7 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
   if (rel !== null) {
     const dt = new Date(Date.UTC(today.y, today.m - 1, today.d + rel));
     y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate(); explicitYear = true;
-  } else if ((r = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/))) {
+  } else if ((r = text.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/))) {
     [y, m, d] = [+r[1], +r[2], +r[3]]; explicitYear = true; cut(r[0]);
   } else if ((r = text.match(/(?<![\d:])(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?(?![\d:])/))) {
     const a = +r[1], b = +r[2];
@@ -86,6 +97,17 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
   } else if ((r = text.match(new RegExp(`(${monthAlternation})\\s*(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?`, 'i')))) {
     m = monthIndex(r[1]) + 1; d = +r[2]; if (r[3]) { y = +r[3]; explicitYear = true; } cut(r[0]);
   }
+  // "يوم الجمعة" / "on friday" → the next one (today counts if it's still ahead)
+  if ((!m || !d) && (r = text.match(WEEKDAY_RE))) {
+    const want = WEEKDAYS.findIndex(list => list.some(n => n === r[1].toLowerCase()));
+    const nowDow = new Date(Date.UTC(today.y, today.m - 1, today.d)).getUTCDay();
+    let add = (want - nowDow + 7) % 7;
+    weekdayHit = { add };
+    const dt = new Date(Date.UTC(today.y, today.m - 1, today.d + add));
+    y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate(); explicitYear = true;
+    cut(r[0]);
+  }
+  else if (m && d) text = text.replace(new RegExp(WEEKDAY_RE.source, 'gi'), ' '); // "يوم الجمعة 30/11" → keep the date, drop the weekday word
   const noDate = !m || !d;
   if (noDate && !(allowTimeOnly || REMIND.test(raw))) return null; // no date → not an event
 
@@ -93,7 +115,9 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
   let time = null;
   const pm = s => /pm|م|مساء|مساءً|عصرا|عصراً|بالليل|ليلا|ليلاً/i.test(s || '');
   const am = s => /am|ص|صباحا|صباحاً|الصبح|فجرا/i.test(s || '');
+  let noMark = false;
   const setTime = (h, min, mark) => {
+    noMark = !mark;
     if (pm(mark) && h < 12) h += 12;
     if (am(mark) && h === 12) h = 0;
     if (h < 24 && min < 60) time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
@@ -102,6 +126,13 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
   if ((r = text.match(new RegExp(`(?:الساعة|الساعه|at|@)?\\s*(\\d{1,2}):(\\d{2})\\s*${MARK}`, 'i')))) { setTime(+r[1], +r[2], r[3]); cut(r[0]); }
   else if ((r = text.match(new RegExp(`(?:الساعة|الساعه|at|@)\\s*(\\d{1,2})\\s*${MARK}`, 'i')))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
   else if ((r = text.match(/(?<!\d)(\d{1,2})\s*(am|pm|صباحاً|صباحا|مساءً|مساء)(?![\w؀-ۿ])/i))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
+
+  if (weekdayHit && weekdayHit.add === 0) {
+    const [hh, mi] = (time || '23:59').split(':').map(Number);
+    if (hh * 60 + mi <= today.hh * 60 + today.mm) {
+      const dt = new Date(Date.UTC(y, m - 1, d + 7)); y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate();
+    }
+  }
 
   // "ذكرني الساعة 6 اتصل بأمي" → today at 6, or tomorrow if 6 has passed
   if (noDate) {
@@ -124,12 +155,18 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
     .replace(/^\s*(مناسب[ةه]|تذكير|ذكرني|ذكّرني|نبهني|event|remind\s*me\s*(?:to)?|reminder|remind|note)\s*[:\-]?\s*(?:ب|ان|أن)?\s*/i, '')
     .replace(/\s(في|يوم|بتاريخ|تاريخ|on|at|the|of)\s*$/i, ' ')
     .replace(/^\s*(في|يوم|on)\s/i, ' ')
+    .replace(/(^|\s)(?:بتاريخ|تاريخ|عندي|عندنا|في)(?=\s|$)/g, ' ')
     .replace(/\s+/g, ' ').replace(/^[\s,،.:\-]+|[\s,،.:\-]+$/g, '').trim();
   const REMINDER = { kind: 'reminder', emoji: '⏰' };
   const k = (forceKind === 'reminder' && REMINDER)
     || KINDS.find(x => x.re.test(title || raw))
     || (REMIND.test(raw) && REMINDER)
     || { kind: 'event', emoji: '📅' };
+  // "عرس الساعة 6" means 6 in the evening
+  if (time && noMark && ['wedding', 'party', 'birthday', 'anniversary'].includes(k.kind)) {
+    const [hh, mi] = time.split(':').map(Number);
+    if (hh >= 1 && hh <= 7) time = `${String(hh + 12).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+  }
   const yearly = Boolean(k.yearly) || /كل\s*سن[ةه]|سنوي|every\s*year|yearly/i.test(raw);
   title = title.replace(/كل\s*سن[ةه]|سنويا|سنوياً|every\s*year|yearly/ig, '').trim();
 

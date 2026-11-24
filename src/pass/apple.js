@@ -21,7 +21,7 @@ function localDate(f) {
   return new Intl.DateTimeFormat(locale(c.lang(f)), { timeZone: f.timezone, weekday: 'long', day: 'numeric', month: 'short' }).format(new Date());
 }
 
-function passJson(family) {
+function passJson(family, { withStrip = false } = {}) {
   const L = c.lang(family);
   const align = L === 'ar' ? 'PKTextAlignmentRight' : 'PKTextAlignmentLeft';
   const brand = t(L, 'brand');
@@ -48,11 +48,13 @@ function passJson(family) {
     backgroundColor: COLORS.bg,
     labelColor: COLORS.label,
     sharingProhibited: true,
-    generic: {
+    [withStrip ? 'storeCard' : 'generic']: {
       headerFields: [{ key: 'date', label: t(L, 'today'), value: localDate(family), textAlignment: align }],
-      primaryFields: [{ key: 'count', label: t(L, 'homeOrders'), value: c.frontTitle(family) }],
-      secondaryFields: [{ key: 'items', label: t(L, 'list'), value: c.hasItems(family) ? c.itemsLine(family, 4) : '—', textAlignment: align }],
-      auxiliaryFields: aux,
+      // With the strip image the list, tasks and events are drawn in the picture;
+      // only the reminder time stays as text under it.
+      primaryFields: withStrip ? [] : [{ key: 'count', label: t(L, 'homeOrders'), value: c.frontTitle(family) }],
+      secondaryFields: withStrip ? [] : [{ key: 'items', label: t(L, 'list'), value: c.hasItems(family) ? c.itemsLine(family, 4) : '—', textAlignment: align }],
+      auxiliaryFields: withStrip ? [{ key: 'next', label: t(L, 'reminder'), value: family.reminderTimes.join(' · ') || '—', textAlignment: align }] : aux,
       backFields: [
         { key: 'open', label: t(L, 'fullListLabel'), value: listUrl, attributedValue: `<a href="${listUrl}">${t(L, 'fullListLink', family.items.length)}</a>` },
         { key: 'full', label: t(L, 'allOrders', family.items.length), value: fullList },
@@ -91,7 +93,9 @@ function passJson(family) {
 }
 
 async function buildPass(family) {
-  const buffers = { ...assetBuffers, 'pass.json': Buffer.from(JSON.stringify(passJson(family))) };
+  let strip = null;
+  try { strip = require('./strip').stripImages(family); } catch (e) { console.error('[strip]', e.message); }
+  const buffers = { ...assetBuffers, ...(strip || {}), 'pass.json': Buffer.from(JSON.stringify(passJson(family, { withStrip: Boolean(strip) }))) };
   const pass = new PKPass(buffers, {
     wwdr: cfg.apple.wwdr,
     signerCert: cfg.apple.signerCert,
