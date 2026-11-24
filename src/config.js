@@ -49,7 +49,8 @@ const cfg = {
   google: {
     issuerId: process.env.GOOGLE_ISSUER_ID || '',
     classSuffix: process.env.GOOGLE_CLASS_SUFFIX || 'home_list',
-    serviceAccount: (() => { const b = secret('GOOGLE_SERVICE_ACCOUNT'); return b ? JSON.parse(b.toString()) : null; })(),
+    serviceAccount: null,
+    error: null,
   },
 
   whatsapp: {
@@ -67,5 +68,22 @@ const cfg = {
 
   anthropicKey: process.env.ANTHROPIC_API_KEY || '',
 };
+
+// Google service account: tolerate wrapping quotes, base64, or the _JSON name; record why it failed.
+(() => {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT || process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
+  if (!raw.trim()) { cfg.google.error = 'GOOGLE_SERVICE_ACCOUNT is empty or missing'; return; }
+  let v = raw.replace(/\r/g, '').trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+  if (!v.startsWith('{')) { try { const d = Buffer.from(v, 'base64').toString(); if (d.trim().startsWith('{')) v = d; } catch {} }
+  try {
+    const j = JSON.parse(v);
+    if (!j.client_email || !j.private_key) throw new Error('missing client_email or private_key');
+    j.private_key = j.private_key.replace(/\\n/g, '\n');
+    cfg.google.serviceAccount = j;
+  } catch (e) {
+    cfg.google.error = 'GOOGLE_SERVICE_ACCOUNT is not valid JSON: ' + e.message + ` (starts with "${v.slice(0, 12)}")`;
+  }
+})();
 
 module.exports = cfg;

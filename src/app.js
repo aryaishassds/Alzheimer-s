@@ -94,7 +94,9 @@ async function handle(req) {
     adminTokenSet: Boolean(cfg.adminToken), adminTokenLength: cfg.adminToken.length,
     apple: { teamId: Boolean(cfg.apple.teamId), passTypeId: cfg.apple.passTypeId || null,
       cert: Boolean(cfg.apple.signerCert), key: Boolean(cfg.apple.signerKey), wwdr: Boolean(cfg.apple.wwdr) },
-    whatsapp: Boolean(cfg.whatsapp.token), stripe: Boolean(cfg.stripe.paymentLink), google: Boolean(cfg.google.serviceAccount),
+    whatsapp: Boolean(cfg.whatsapp.token), stripe: Boolean(cfg.stripe.paymentLink),
+    google: Boolean(cfg.google.serviceAccount && cfg.google.issuerId),
+    googleDetail: { issuerId: Boolean(cfg.google.issuerId), serviceAccount: Boolean(cfg.google.serviceAccount), error: cfg.google.error },
   });
 
   // WhatsApp
