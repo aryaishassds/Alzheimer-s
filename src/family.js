@@ -44,7 +44,7 @@ function addItems(fam, texts, byPhone) {
     for (const text of clean) f.items.push({ text, by: byPhone, at: Date.now() });
     const s = c.lang(f) === 'ar' ? '، ' : ', ';
     f.lastAdded = `${clean.join(s)} · ${timeLabel(f)}`; // the time makes it unique, so the iPhone always notifies
-    return t(c.lang(f), 'addedNotify', clean.join(s));
+    // no Android push here: Google allows only 3 per day, kept for reminders and events
   });
 }
 

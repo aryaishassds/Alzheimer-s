@@ -76,17 +76,23 @@ async function ensureClass() {
 }
 
 // Link the customer taps to add the card on Android.
+// The class travels inside the link too, so Google creates it on first use.
 function saveUrl(family) {
   if (!enabled()) return null;
   const sa = cfg.google.serviceAccount;
   const jwt = signJwt({
     iss: sa.client_email, aud: 'google', typ: 'savetowallet', origins: [cfg.baseUrl],
-    payload: { genericObjects: [genericObject(family)] },
+    payload: {
+      genericClasses: [{ id: classId(), multipleDevicesAndHoldersAllowedStatus: 'MULTIPLE_HOLDERS' }],
+      genericObjects: [genericObject(family)],
+    },
   });
   return `https://pay.google.com/gp/v/save/${jwt}`;
 }
 
 // Push the latest content. `notify` adds a message that shows as a phone notification.
+// Google allows only 3 notifications per pass per day, so we use them for reminders,
+// events and offers — not for every item added.
 async function update(family, notify) {
   if (!enabled()) return null;
   const token = await accessToken();
@@ -95,11 +101,14 @@ async function update(family, notify) {
     method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(obj),
   });
+  if (res.status === 404) return 404; // not saved to any Android phone yet
+  if (!res.ok) console.error('[google update]', res.status, (await res.text()).slice(0, 300));
   if (notify) {
-    await fetch(`${API}/genericObject/${obj.id}/addMessage`, {
+    const r = await fetch(`${API}/genericObject/${obj.id}/addMessage`, {
       method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ message: { header: cfg.brandName, body: notify, id: 'm' + Date.now(), messageType: 'TEXT_AND_NOTIFY' } }),
+      body: JSON.stringify({ message: { header: c.lang(family) === 'ar' ? cfg.brandName : cfg.brandNameEn, body: notify, id: 'm' + Date.now(), messageType: 'TEXT_AND_NOTIFY' } }),
     });
+    if (!r.ok) console.error('[google notify]', r.status, (await r.text()).slice(0, 200));
   }
   return res.status;
 }
