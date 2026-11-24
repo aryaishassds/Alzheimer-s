@@ -24,6 +24,30 @@ async function api(body) {
 const send = (to, text) => api({ to, type: 'text', text: { body: text, preview_url: true } });
 const markRead = id => api({ status: 'read', message_id: id });
 
+// Tappable list of options (WhatsApp interactive list: max 10 rows, titles up to 24 chars)
+function sendMenu(to, L) {
+  const row = (id, key) => { const [title, description] = t(L, key); return { id, title, description }; };
+  return api({
+    to, type: 'interactive',
+    interactive: {
+      type: 'list',
+      body: { text: t(L, 'menuBody') },
+      action: {
+        button: t(L, 'menuButton'),
+        sections: [
+          { title: t(L, 'menuSection'), rows: [row('m:item', 'mItem'), row('m:event', 'mEvent'), row('m:task', 'mTask'), row('m:reminder', 'mReminder'), row('m:location', 'mLocation')] },
+          { title: t(L, 'menuSection2'), rows: [row('m:list', 'mList'), row('m:clear', 'mClear'), row('m:help', 'mHelp')] },
+        ],
+      },
+    },
+  });
+}
+// Up to 3 reply buttons (titles up to 20 chars)
+const sendButtons = (to, text, buttons) => api({
+  to, type: 'interactive',
+  interactive: { type: 'button', body: { text }, action: { buttons: buttons.map(([id, title]) => ({ type: 'reply', reply: { id, title } })) } },
+});
+
 const cardLink = f => `${cfg.baseUrl}/card/${f.serial}?t=${f.authToken}`;
 const inviteLink = f => `https://wa.me/${cfg.whatsapp.botNumber}?text=${encodeURIComponent((c.lang(f) === 'ar' ? 'انضمام-' : 'join-') + f.joinCode)}`;
 const payLink = (f, L) => cfg.stripe.paymentLink ? `${cfg.stripe.paymentLink}?client_reference_id=${f.id}` : t(L, 'payLinkMissing');
@@ -41,6 +65,7 @@ async function onStart(phone, name, L) {
   const lang = isNew ? L : c.lang(f);
   const trial = isNew ? t(lang, 'trial', cfg.trialDays, cfg.priceUsd, payLink(f, lang)) : '';
   await send(phone, t(lang, 'welcome', name || '', cardLink(f), inviteLink(f), trial));
+  await sendMenu(phone, lang);
 }
 
 // Language to answer in: the language the person just wrote in, else the family's.
@@ -62,6 +87,12 @@ async function handle(msg, contactName) {
     return send(phone, r.home ? t(L, 'homeSaved') : t(L, 'placeSaved', target));
   }
 
+  if (msg.type === 'interactive') {
+    if (!f) return onStart(phone, name, L);
+    const id = msg.interactive?.list_reply?.id || msg.interactive?.button_reply?.id || '';
+    return onChoice(f, phone, id, L);
+  }
+
   if (msg.type !== 'text') {
     if (f) await markRead(msg.id);
     return; // voice / images: later
@@ -69,7 +100,8 @@ async function handle(msg, contactName) {
 
   const cmd = command(text);
 
-  if (cmd?.cmd === 'start' || (!f && !cmd)) return onStart(phone, name, L);
+  if (!f && (cmd?.cmd === 'start' || !cmd)) return onStart(phone, name, L);
+  if (f && (cmd?.cmd === 'start' || cmd?.cmd === 'menu')) { await db.clearState(phone); return sendMenu(phone, L); }
 
   if (cmd?.cmd === 'join') {
     const target = await db.familyByJoinCode(cmd.code);
@@ -99,6 +131,12 @@ async function handle(msg, contactName) {
       const e = await fam.removeEvent(f, cmd.q);
       return send(phone, e ? t(L, 'eventRemoved', ev.label(e, L)) : t(L, 'eventNotFound'));
     }
+    case 'tasks': return send(phone, t(L, 'tasksList', (f.tasks || []).map((x, i) => `${i + 1}. ${x.text}`).join('\n')));
+    case 'task': { await db.clearState(phone); const x = await fam.addTask(f, cmd.text, phone); return x ? send(phone, t(L, 'taskAdded', x.text)) : markRead(msg.id); }
+    case 'done': {
+      const x = await fam.doneTask(f, cmd.q);
+      return send(phone, x ? t(L, 'taskDone', x.text) : t(L, 'taskNotFound'));
+    }
     case 'clear': await fam.clear(f); return markRead(msg.id);
     case 'remove': await fam.removeItem(f, cmd.text); return markRead(msg.id);
     case 'lang': await fam.setLang(f, cmd.lang); return send(phone, t(cmd.lang, 'langSet'));
@@ -121,17 +159,84 @@ async function handle(msg, contactName) {
       return send(phone, t(L, 'optedOut'));
   }
 
+  // The person picked something from the menu → read the text that way.
+  const st = cmd ? null : await db.getState(phone);
+  if (st) {
+    const opts = { tz: f.timezone, monthFirst: String(f.ownerPhone).startsWith('1') };
+    switch (st.mode) {
+      case 'item': {
+        await db.clearState(phone);
+        const items = await splitItems(text);
+        if (items.length) await fam.addItems(f, items, phone);
+        return send(phone, t(L, 'itemsAdded', items.join(L === 'ar' ? '، ' : ', ')));
+      }
+      case 'task': {
+        await db.clearState(phone);
+        const x = await fam.addTask(f, text, phone);
+        return x ? send(phone, t(L, 'taskAdded', x.text)) : markRead(msg.id);
+      }
+      case 'event': {
+        const e = ev.parseEvent(text, opts);
+        if (!e) return send(phone, t(L, 'needDate'));
+        await db.clearState(phone);
+        await fam.addEvent(f, e);
+        return send(phone, t(L, e.kind === 'reminder' ? 'reminderSet' : 'eventAdded', e.kind === 'reminder' ? (e.title || ev.label(e, L)) : ev.label(e, L), ev.whenText(e, L, f.timezone)));
+      }
+      case 'reminder': {
+        const e = ev.parseEvent(text, { ...opts, allowTimeOnly: true, forceKind: 'reminder' });
+        if (!e) return send(phone, t(L, 'needTime'));
+        await db.clearState(phone);
+        await fam.addEvent(f, e);
+        return send(phone, t(L, e.kind === 'reminder' ? 'reminderSet' : 'eventAdded', e.kind === 'reminder' ? (e.title || ev.label(e, L)) : ev.label(e, L), ev.whenText(e, L, f.timezone)));
+      }
+      case 'placeName': {
+        await db.clearState(phone);
+        const nameOfPlace = text.trim().slice(0, 30);
+        await db.updateFamily(f.id, x => { x.pendingLocation = nameOfPlace; });
+        return send(phone, t(L, 'sendLocation', nameOfPlace));
+      }
+    }
+  }
+
   // A date in the message → it's an event (birthday, wedding, flight...)
   const e = ev.parseEvent(text, { tz: f.timezone, monthFirst: String(f.ownerPhone).startsWith('1') });
   if (e) {
     await fam.addEvent(f, e);
-    return send(phone, t(L, 'eventAdded', ev.label(e, L), ev.whenText(e, L, f.timezone)));
+    return send(phone, t(L, e.kind === 'reminder' ? 'reminderSet' : 'eventAdded', e.kind === 'reminder' ? (e.title || ev.label(e, L)) : ev.label(e, L), ev.whenText(e, L, f.timezone)));
   }
 
   // Otherwise it's a list message. Add silently, mark as read (free), no reply.
   const items = await splitItems(text);
   if (items.length) await fam.addItems(f, items, phone);
   return markRead(msg.id);
+}
+
+// A tapped menu row or button.
+async function onChoice(f, phone, id, L) {
+  switch (id) {
+    case 'm:item': await db.setState(phone, 'item'); return send(phone, t(L, 'askItem'));
+    case 'm:event': await db.setState(phone, 'event'); return send(phone, t(L, 'askEvent'));
+    case 'm:task': await db.setState(phone, 'task'); return send(phone, t(L, 'askTask'));
+    case 'm:reminder': await db.setState(phone, 'reminder'); return send(phone, t(L, 'askReminder'));
+    case 'm:location':
+      return sendButtons(phone, t(L, 'askLocation'), [['loc:home', t(L, 'locHome')], ['loc:other', t(L, 'locOther')]]);
+    case 'loc:home': {
+      const home = L === 'ar' ? 'البيت' : 'Home';
+      await db.updateFamily(f.id, x => { x.pendingLocation = home; });
+      return send(phone, t(L, 'sendLocation', home));
+    }
+    case 'loc:other': await db.setState(phone, 'placeName'); return send(phone, t(L, 'askPlaceName'));
+    case 'm:list': {
+      const fresh = await db.getFamily(f.id);
+      const items = fresh.items.length ? fresh.items.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : t(L, 'none');
+      const tasks = (fresh.tasks || []).length ? fresh.tasks.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : t(L, 'none');
+      const evs = ev.upcoming(fresh.events, fresh.timezone).map((e, i) => `${i + 1}. ${ev.label(e, L)} – ${ev.whenText(e, L, fresh.timezone)}`).join('\n') || t(L, 'none');
+      return send(phone, t(L, 'overview', items, tasks, evs));
+    }
+    case 'm:clear': await fam.clear(f); return send(phone, t(L, 'cleared'));
+    case 'm:help': return send(phone, t(L, 'help'));
+    default: return sendMenu(phone, L);
+  }
 }
 
 // Meta sends message events here. Returns an HTTP status.

@@ -52,10 +52,12 @@ function zonedToUtc(y, m, d, hh, mm, tz) {
 const validDate = (y, m, d) => m >= 1 && m <= 12 && d >= 1 && d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
 
 // ---------- parsing ----------
-const EXPLICIT = /^\s*(مناسب[ةه]|تذكير|ذكرني|ذكّرني|event|remind|reminder)\b/i;
+const EXPLICIT = /^\s*(مناسب[ةه]|تذكير|ذكرني|ذكّرني|event|remind|reminder)(?=\s|$|[:،,])/i;
 const UNITS = /كيلو|كغ|كجم|غرام|جرام|جم|لتر|ليتر|علب[ةه]?|حب[ةه]|كيس|كرتون[ةه]?|ربطة|\bkg\b|\blb\b|\boz\b|\bg\b|liter|litre|gallon|pack|bag|box|dozen/i;
 
-function parseEvent(raw, { tz = 'UTC', monthFirst = false } = {}) {
+const REMIND = /^\s*(ذكرني|ذكّرني|تذكير|نبهني|remind\s*me|reminder)(?=\s|$|[:،,])/i;
+
+function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false, forceKind = null } = {}) {
   // "1/2 كيلو لحمة" is a quantity, not a date — unless the user says it's an event.
   if (UNITS.test(raw) && !EXPLICIT.test(raw)) return null;
   let text = toLatin(raw).trim();
@@ -83,10 +85,9 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false } = {}) {
     d = +r[1]; m = monthIndex(r[2]) + 1; if (r[3]) { y = +r[3]; explicitYear = true; } cut(r[0]);
   } else if ((r = text.match(new RegExp(`(${monthAlternation})\\s*(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?`, 'i')))) {
     m = monthIndex(r[1]) + 1; d = +r[2]; if (r[3]) { y = +r[3]; explicitYear = true; } cut(r[0]);
-  } else {
-    return null; // no date → not an event
   }
-  if (!m || !d) return null;
+  const noDate = !m || !d;
+  if (noDate && !(allowTimeOnly || REMIND.test(raw))) return null; // no date → not an event
 
   // time
   let time = null;
@@ -102,6 +103,15 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false } = {}) {
   else if ((r = text.match(new RegExp(`(?:الساعة|الساعه|at|@)\\s*(\\d{1,2})\\s*${MARK}`, 'i')))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
   else if ((r = text.match(/(?<!\d)(\d{1,2})\s*(am|pm|صباحاً|صباحا|مساءً|مساء)(?![\w؀-ۿ])/i))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
 
+  // "ذكرني الساعة 6 اتصل بأمي" → today at 6, or tomorrow if 6 has passed
+  if (noDate) {
+    if (!time) return null;
+    const [hh, mi] = time.split(':').map(Number);
+    const passed = hh * 60 + mi <= today.hh * 60 + today.mm;
+    const dt = new Date(Date.UTC(today.y, today.m - 1, today.d + (passed ? 1 : 0)));
+    y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate(); explicitYear = true;
+  }
+
   // year: next occurrence
   if (!explicitYear) {
     y = today.y;
@@ -111,11 +121,15 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false } = {}) {
   if (!validDate(y, m, d)) return null;
 
   let title = text
-    .replace(/^\s*(مناسب[ةه]|تذكير|ذكرني|ذكّرني|event|remind\s*me|reminder|remind|note)\s*[:\-]?\s*/i, '')
+    .replace(/^\s*(مناسب[ةه]|تذكير|ذكرني|ذكّرني|نبهني|event|remind\s*me\s*(?:to)?|reminder|remind|note)\s*[:\-]?\s*(?:ب|ان|أن)?\s*/i, '')
     .replace(/\s(في|يوم|بتاريخ|تاريخ|on|at|the|of)\s*$/i, ' ')
     .replace(/^\s*(في|يوم|on)\s/i, ' ')
     .replace(/\s+/g, ' ').replace(/^[\s,،.:\-]+|[\s,،.:\-]+$/g, '').trim();
-  const k = KINDS.find(x => x.re.test(title || raw)) || { kind: 'event', emoji: '📅' };
+  const REMINDER = { kind: 'reminder', emoji: '⏰' };
+  const k = (forceKind === 'reminder' && REMINDER)
+    || KINDS.find(x => x.re.test(title || raw))
+    || (REMIND.test(raw) && REMINDER)
+    || { kind: 'event', emoji: '📅' };
   const yearly = Boolean(k.yearly) || /كل\s*سن[ةه]|سنوي|every\s*year|yearly/i.test(raw);
   title = title.replace(/كل\s*سن[ةه]|سنويا|سنوياً|every\s*year|yearly/ig, '').trim();
 
@@ -137,6 +151,7 @@ function eventEnd(e, tz) {
 
 // When to notify, as [key, epochMs, kind]
 function triggers(e, tz) {
+  if (e.kind === 'reminder') return [['at', eventStart(e, tz), 'now']];
   const out = [];
   const prev = new Date(Date.UTC(e.y, e.m - 1, e.d - 1));
   out.push(['dayBefore', zonedToUtc(prev.getUTCFullYear(), prev.getUTCMonth() + 1, prev.getUTCDate(), 20, 0, tz), 'tomorrow']);

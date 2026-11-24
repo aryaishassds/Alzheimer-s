@@ -32,6 +32,7 @@ const K = {
   reg: (serial, dev) => `reg/${serial}/${dev}`,
   dev: (dev, serial) => `dev/${dev}/${serial}`,
   camp: () => `camp/${Date.now()}`,
+  state: p => `state/${p}`,
 };
 
 async function createFamily(ownerPhone, ownerName, lang = 'ar') {
@@ -42,7 +43,7 @@ async function createFamily(ownerPhone, ownerName, lang = 'ar') {
     ownerPhone, members: [ownerPhone], names: { [ownerPhone]: ownerName || '' },
     items: [], lastAdded: '', locations: [], pendingLocation: null,
     reminderTimes: ['17:00'], clearAt: '00:00', timezone: guessTimezone(ownerPhone),
-    reminderNote: '', offerNote: '', eventNote: '', events: [], lang, lastRuns: {},
+    reminderNote: '', offerNote: '', eventNote: '', events: [], tasks: [], lang, lastRuns: {},
     status: 'trial', trialEnds: Date.now() + Number(process.env.TRIAL_DAYS || 7) * 864e5, paidUntil: 0,
     optInOffers: true, updatedAt: Date.now(), createdAt: Date.now(),
   };
@@ -117,10 +118,18 @@ async function deletePhone(phone) {
   const devs = regs.map(k => k.split('/').pop());
   await Promise.all([
     ...f.members.map(p => kv.del(K.phone(p))),
-    kv.del(K.serial(f.serial)), kv.del(K.join(f.joinCode)), kv.del(K.fam(f.id)),
+    kv.del(K.serial(f.serial)), kv.del(K.join(f.joinCode)), kv.del(K.fam(f.id)), kv.del(K.state(phone)),
     ...regs.map(k => kv.del(k)), ...devs.map(d => kv.del(K.dev(d, f.serial))),
   ]);
 }
+
+// What a person picked from the WhatsApp menu, kept for 10 minutes.
+async function getState(phone) {
+  const st = await kv.get(K.state(phone));
+  return st && st.exp > Date.now() ? st : null;
+}
+const setState = (phone, mode, extra = {}) => kv.set(K.state(phone), { mode, ...extra, exp: Date.now() + 10 * 60e3 });
+const clearState = phone => kv.del(K.state(phone));
 
 async function logCampaign(c) { await kv.set(K.camp(), { ...c, at: Date.now() }); }
 async function campaigns() {
@@ -131,5 +140,5 @@ async function campaigns() {
 module.exports = {
   createFamily, getFamily, familyByPhone, familyBySerial, familyByJoinCode, allFamilies,
   updateFamily, addMember, register, unregister, serialsForDevice, devicesForSerial,
-  logCampaign, campaigns, guessTimezone, deletePhone,
+  logCampaign, campaigns, guessTimezone, deletePhone, getState, setState, clearState,
 };

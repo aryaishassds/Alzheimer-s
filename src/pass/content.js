@@ -41,9 +41,19 @@ function eventsBlock(f) {
   return list.map((e, i) => `${i + 1}. ${ev.label(e, lang(f))}\n   ${ev.whenText(e, lang(f), f.timezone)}${e.yearly ? ' · ' + t(lang(f), 'yearly') : ''}`).join('\n');
 }
 
+function tasksLine(f, max = 4) {
+  const list = (f.tasks || []).map(x => x.text);
+  if (list.length <= max) return list.join(sep(f));
+  return list.slice(0, max).join(sep(f)) + ` +${list.length - max}`;
+}
+function tasksBlock(f) {
+  const list = f.tasks || [];
+  return list.length ? list.map((x, i) => `${i + 1}. ${x.text}`).join('\n') : t(lang(f), 'noTasks');
+}
+
 function isActive(f) {
   const now = Date.now();
   return (f.status === 'paid' && f.paidUntil > now) || (f.status === 'trial' && f.trialEnds > now);
 }
 
-module.exports = { itemsLine, hasItems, frontTitle, locationText, activeLocations, isActive, nextEvent, nextEventShort, eventsBlock, lang, MAX_LOCATIONS };
+module.exports = { tasksLine, tasksBlock, itemsLine, hasItems, frontTitle, locationText, activeLocations, isActive, nextEvent, nextEventShort, eventsBlock, lang, MAX_LOCATIONS };

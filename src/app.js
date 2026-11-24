@@ -60,6 +60,7 @@ async function listPage(serial, tok) {
   const L = f.lang || 'ar';
   const time = at => new Intl.DateTimeFormat(locale(L), { timeZone: f.timezone, hour: 'numeric', minute: '2-digit' }).format(new Date(at));
   const rows = f.items.map((i, n) => `<li><span class="n">${n + 1}</span><span class="t">${escH(i.text)}</span><span class="m">${escH(f.names[i.by] || '')} · ${time(i.at)}</span></li>`).join('');
+  const tasks = (f.tasks || []).map((x, n) => `<li><span class="n">${n + 1}</span><span class="t">${escH(x.text)}</span><span class="m">${escH(f.names[x.by] || '')}</span></li>`).join('');
   const evs = ev.upcoming(f.events, f.timezone).map(e => `<li><span class="t">${escH(ev.label(e, L))}</span><span class="m">${escH(ev.whenText(e, L, f.timezone))}</span></li>`).join('');
   return html(`<!doctype html><html lang="${L}" dir="${t(L, 'dir')}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escH(t(L, 'brand'))}</title>
@@ -71,6 +72,7 @@ ul{list-style:none;margin:0;padding:12px}li{background:#fff7d1;border:1px solid 
 .t{flex:1;font-size:18px;font-weight:600}.m{color:#8a7d55;font-size:12px;white-space:nowrap}.e{text-align:center;padding:40px;color:#8a7d55}</style>
 <header><h1>📝 ${escH(t(L, 'homeOrders'))}</h1><div class="c">${escH(t(L, 'count', f.items.length))}</div></header>
 ${f.items.length ? `<ul>${rows}</ul>` : `<div class="e">${escH(t(L, 'listEmpty'))}</div>`}
+${tasks ? `<h2>✅ ${escH(t(L, 'tasks'))}</h2><ul>${tasks}</ul>` : ''}
 ${evs ? `<h2>📅 ${escH(t(L, 'events'))}</h2><ul>${evs}</ul>` : ''}</html>`);
 }
 

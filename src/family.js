@@ -93,12 +93,43 @@ async function removeLocation(fam, name) {
 const setReminderTimes = (fam, times) => change(fam.id, f => { f.reminderTimes = times; });
 const setLang = (fam, L) => change(fam.id, f => { f.lang = L; });
 
-// Scheduler: daily reminder, only when the list has items.
+// Scheduler: daily reminder, only when there are items or open tasks.
 const timeReminder = fam => change(fam.id, f => {
-  if (!c.hasItems(f)) return false;
-  f.reminderNote = t(c.lang(f), 'beforeYouReturn', dayLabel(f), c.itemsLine(f, 6));
+  const L = c.lang(f);
+  const tasks = (f.tasks || []).length;
+  if (!c.hasItems(f) && !tasks) return false;
+  f.reminderNote = c.hasItems(f)
+    ? t(L, 'beforeYouReturn', dayLabel(f), c.itemsLine(f, 6)) + (tasks ? ` · ${t(L, 'tasksCount', tasks)}` : '')
+    : t(L, 'tasksReminder', dayLabel(f), c.tasksLine(f, 4));
   return f.reminderNote;
 });
+
+// ---------- tasks (to-dos that stay until done) ----------
+async function addTask(fam, text, byPhone) {
+  let added = null;
+  await change(fam.id, f => {
+    f.tasks = f.tasks || [];
+    const clean = text.trim();
+    if (!clean || f.tasks.some(x => sameItem(x.text, clean)) || f.tasks.length >= 50) return false;
+    added = { id: Math.random().toString(36).slice(2, 8), text: clean, by: byPhone, at: Date.now() };
+    f.tasks.push(added);
+    f.taskNote = `${t(c.lang(f), 'taskAdded', clean)} · ${timeLabel(f)}`;
+  });
+  return added;
+}
+
+async function doneTask(fam, q) {
+  let done = null;
+  await change(fam.id, f => {
+    const list = f.tasks || [];
+    const s = String(q).trim();
+    const target = /^\d+$/.test(s) ? list[Number(s) - 1] : list.find(x => x.text.includes(s));
+    if (!target) return false;
+    f.tasks = list.filter(x => x.id !== target.id);
+    done = target;
+  });
+  return done;
+}
 
 const sendOffer = (fam, text) => change(fam.id, f => { f.offerNote = `${text} (${dayLabel(f)})`; return text; });
 
@@ -112,7 +143,7 @@ async function addEvent(fam, e) {
     added = e;
     const L = c.lang(f);
     // shows on the iPhone as a notification, so the sender sees how the date was understood
-    f.eventNote = `${t(L, 'eventAdded', ev.label(e, L), ev.whenText(e, L, f.timezone))} · ${timeLabel(f)}`;
+    f.eventNote = `${e.kind === 'reminder' ? t(L, 'reminderSet', e.title || ev.label(e, L), ev.whenText(e, L, f.timezone)) : t(L, 'eventAdded', ev.label(e, L), ev.whenText(e, L, f.timezone))} · ${timeLabel(f)}`;
     return f.eventNote;
   });
   return added;
@@ -139,7 +170,8 @@ const eventNotify = (fam, eventId, kind) => change(fam.id, f => {
   const L = c.lang(f);
   const name = ev.label(e, L);
   const when = e.time ? ` · ${ev.whenText(e, L, f.timezone, { withWeekday: false })}` : '';
-  const text = kind === 'tomorrow' ? t(L, 'eventTomorrow', name + when)
+  const text = kind === 'now' ? t(L, 'reminderNow', e.title || name)
+    : kind === 'tomorrow' ? t(L, 'eventTomorrow', name + when)
     : kind === 'today' ? t(L, 'eventToday', name + when)
     : t(L, 'eventSoon', name, e.lead);
   f.eventNote = text;
@@ -148,5 +180,5 @@ const eventNotify = (fam, eventId, kind) => change(fam.id, f => {
 
 module.exports = {
   addItems, removeItem, clear, setLocation, removeLocation, setReminderTimes, setLang,
-  timeReminder, sendOffer, addEvent, removeEvent, eventNotify, refresh, change,
+  timeReminder, sendOffer, addEvent, removeEvent, eventNotify, refresh, change, addTask, doneTask,
 };

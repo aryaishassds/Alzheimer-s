@@ -34,6 +34,7 @@ function passJson(family) {
 
   const aux = [{ key: 'next', label: t(L, 'reminder'), value: family.reminderTimes.join(' · ') || '—', textAlignment: align }];
   if (next) aux.unshift({ key: 'event', label: t(L, 'nextEvent'), value: next, textAlignment: align });
+  if ((family.tasks || []).length) aux.push({ key: 'tasks', label: t(L, 'tasks'), value: String(family.tasks.length), textAlignment: align });
 
   const json = {
     formatVersion: 1,
@@ -59,6 +60,8 @@ function passJson(family) {
         { key: 'last', label: t(L, 'lastAdded'), value: family.lastAdded || '—', changeMessage: t(L, 'added') },
         { key: 'reminder', label: t(L, 'reminderLabel'), value: family.reminderNote || '—', changeMessage: '%@' },
         { key: 'eventNote', label: '🔔', value: family.eventNote || '—', changeMessage: '%@' },
+        { key: 'tasksList', label: t(L, 'tasks'), value: c.tasksBlock(family) },
+        { key: 'taskNote', label: '✅', value: family.taskNote || '—', changeMessage: '%@' },
         { key: 'events', label: t(L, 'events'), value: c.eventsBlock(family) },
         { key: 'offer', label: t(L, 'offers'), value: family.offerNote || '—', changeMessage: '%@' },
         { key: 'places', label: t(L, 'places'), value: placesList },

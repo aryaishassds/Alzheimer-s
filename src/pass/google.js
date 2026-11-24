@@ -55,6 +55,7 @@ function genericObject(family) {
     textModulesData: [
       { id: 'items', header: t(L, 'list'), body: c.hasItems(family) ? c.itemsLine(family, 12) : '—' },
       ...(next ? [{ id: 'event', header: t(L, 'nextEvent'), body: next }] : []),
+      ...((family.tasks || []).length ? [{ id: 'tasks', header: t(L, 'tasks'), body: c.tasksLine(family, 8) }] : []),
       { id: 'home', header: t(L, 'home'), body: c.locationText(family, { kind: 'home' }) },
       { id: 'reminder', header: t(L, 'reminder'), body: family.reminderTimes.join(' · ') },
     ],

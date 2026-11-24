@@ -58,6 +58,8 @@ function command(raw) {
   if (join) return { cmd: 'join', code: join[1] };
   if (/^(english|انجليزي|الانجليزية|انكليزي)$/i.test(t)) return { cmd: 'lang', lang: 'en' };
   if (/^(عربي|العربية|arabic)$/i.test(t)) return { cmd: 'lang', lang: 'ar' };
+  if (/^(خيارات|الخيارات|قائمة|منيو|menu|options|start menu|0|٠)$/i.test(t)) return { cmd: 'menu' };
+  if (/^(المهام|مهامي|مهام|tasks|my tasks|todo|to do)$/i.test(t)) return { cmd: 'tasks' };
   if (/^(مسح|امسح|clear|clear list)$/i.test(t)) return { cmd: 'clear' };
   if (/^(مساعدة|مساعده|help|commands|\?)$/i.test(t)) return { cmd: 'help' };
   if (/^(القائمة|القائمه|list|my list)$/i.test(t)) return { cmd: 'list' };
@@ -67,6 +69,8 @@ function command(raw) {
   if (/^(حذف حسابي|احذف حسابي|delete my account|delete account)$/i.test(t)) return { cmd: 'deleteAsk' };
   if (/^(تاكيد الحذف|confirm delete)$/i.test(t)) return { cmd: 'deleteConfirm' };
   let m;
+  if ((m = text.match(/^(?:مهم[ةه]|مهمة جديدة|task|todo|to do)\s*[:\-]?\s+(.+)$/i))) return { cmd: 'task', text: m[1].trim() };
+  if ((m = toLatin(text).match(/^(?:تم|خلصت|انجزت|أنجزت|done|did|finished)\s+(?:مهم[ةه]\s+|task\s+)?(.+)$/i))) return { cmd: 'done', q: m[1].trim() };
   if ((m = text.match(/^(?:توقيت|المدينة|مدينة|timezone|time zone|city)\s+(.+)$/i))) return { cmd: 'timezone', tz: cityTimezone(m[1]), name: m[1].trim() };
   if ((m = text.match(/^(?:حذف|احذف|الغاء|إلغاء)\s+(?:مناسبة|مناسبه|موعد|تذكير)\s+(.+)$/))) return { cmd: 'removeEvent', q: toLatin(m[1]) };
   if ((m = text.match(/^(?:remove|delete|cancel)\s+(?:event|reminder)\s+(.+)$/i))) return { cmd: 'removeEvent', q: m[1] };
