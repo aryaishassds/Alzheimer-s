@@ -3,7 +3,6 @@
 import 'passkit-generator';
 import '@netlify/blobs';
 import 'dotenv';
-import '@napi-rs/canvas';
 import app from '../../src/app.js';
 
 export default async (req, context) => {

@@ -4,6 +4,8 @@
 
 [functions]
   node_bundler = "nft"
+  # The drawing library is loaded only when a card is built, and only if it works here.
+  included_files = ["node_modules/@napi-rs/canvas/**", "node_modules/@napi-rs/canvas-linux-x64-gnu/**"]
 
 [[headers]]
   for = "/admin/*"
