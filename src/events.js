@@ -123,8 +123,8 @@ function parseEvent(raw, { tz = 'UTC', monthFirst = false, allowTimeOnly = false
     if (h < 24 && min < 60) time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
   };
   const MARK = '(am|pm|a\\.m\\.|p\\.m\\.|صباحاً|صباحا|مساءً|مساء|عصراً|عصرا|الصبح|بالليل|ص|م)?';
-  if ((r = text.match(new RegExp(`(?:الساعة|الساعه|at|@)?\\s*(\\d{1,2}):(\\d{2})\\s*${MARK}`, 'i')))) { setTime(+r[1], +r[2], r[3]); cut(r[0]); }
-  else if ((r = text.match(new RegExp(`(?:الساعة|الساعه|at|@)\\s*(\\d{1,2})\\s*${MARK}`, 'i')))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
+  if ((r = text.match(new RegExp(`(?:الساعة|الساعه|ساعة|ساعه|at|@)?\\s*(\\d{1,2}):(\\d{2})\\s*${MARK}`, 'i')))) { setTime(+r[1], +r[2], r[3]); cut(r[0]); }
+  else if ((r = text.match(new RegExp(`(?:الساعة|الساعه|ساعة|ساعه|at|@)\\s*(\\d{1,2})\\s*${MARK}`, 'i')))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
   else if ((r = text.match(/(?<!\d)(\d{1,2})\s*(am|pm|صباحاً|صباحا|مساءً|مساء)(?![\w؀-ۿ])/i))) { setTime(+r[1], 0, r[2]); cut(r[0]); }
 
   if (weekdayHit && weekdayHit.add === 0) {
